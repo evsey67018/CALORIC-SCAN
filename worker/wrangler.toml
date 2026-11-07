@@ -1,0 +1,14 @@
+name = "caloric-scan-pay"
+main = "src/index.js"
+compatibility_date = "2026-11-07"
+
+# Не секрет. Через запятую, без пробелов вокруг лишних слэшей.
+[vars]
+ALLOWED_ORIGINS = "https://evsey67018.github.io,http://127.0.0.1:8765,http://localhost:8765"
+
+# Секреты задаются только так и в git не попадают:
+#   npx wrangler secret put SUPABASE_URL
+#   npx wrangler secret put SUPABASE_ANON_KEY
+#   npx wrangler secret put SUPABASE_SERVICE_ROLE_KEY
+#   npx wrangler secret put YOOKASSA_SHOP_ID
+#   npx wrangler secret put YOOKASSA_SECRET_KEY

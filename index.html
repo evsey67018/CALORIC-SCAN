@@ -35,11 +35,19 @@
         <h1>Caloric Scan</h1>
       </div>
     </div>
-    <button id="themeBtn" class="icon-btn" type="button" aria-pressed="false" aria-label="Включить тёмную тему">🌙</button>
+    <div class="top-actions">
+      <button id="navScan" class="text-btn nav-btn" type="button" aria-current="page">Сканер</button>
+      <button id="navDiary" class="text-btn nav-btn" type="button">Дневник</button>
+      <span id="authEmailLabel" class="auth-email" hidden></span>
+      <button id="authBtn" class="text-btn nav-btn" type="button" data-mode="in">Войти</button>
+      <button id="themeBtn" class="icon-btn" type="button" aria-pressed="false" aria-label="Включить тёмную тему">🌙</button>
+    </div>
   </header>
 
   <main>
+    <div id="viewScan">
     <p class="lead">Добавь фото тарелки — найдём каждый ингредиент и прикинем калории. Всё считается в браузере, снимок никуда не уходит.</p>
+    <p id="quotaText" class="quota">Осталось 3 из 3 сканов сегодня</p>
 
     <label class="card upload" id="dropzone">
       <input id="file" type="file" accept="image/*" aria-label="Добавить фото">
@@ -95,7 +103,9 @@
         <p class="note">Калории и граммы приблизительные: площадь маски и типичная толщина продукта, не весы. Рецепт и соус на фото могут отличаться. Не медицинская консультация.</p>
       </article>
     </section>
+    </div>
 
+    <div id="viewDiary" hidden>
     <section class="card diary" id="diary">
       <div class="diary-head">
         <div>
@@ -113,7 +123,9 @@
       <p id="dayMacros" class="muted"></p>
       <ul id="diaryList" class="diary-list"></ul>
       <p id="diaryEmpty" class="muted">Пока пусто — первая тарелка ещё впереди.</p>
+      <p id="diaryHint" class="muted">Войди по почте, и дневник сохранится в аккаунте, а не только в этом браузере.</p>
     </section>
+    </div>
   </main>
 
   <footer>
@@ -121,7 +133,53 @@
     <p class="muted">Caloric Scan считает на устройстве. Фото никуда не отправляется.</p>
   </footer>
 
+  <dialog id="authDialog">
+    <form id="authForm" class="dialog-card">
+      <header class="dialog-head">
+        <h2>Вход по почте</h2>
+        <button id="authClose" class="icon-btn" type="button" aria-label="Закрыть">✕</button>
+      </header>
+      <p class="muted">Без пароля: пришлём ссылку и код. Открой ссылку или введи код здесь.</p>
+      <label class="field" for="authEmail">Почта
+        <input id="authEmail" type="email" required autocomplete="email" placeholder="you@mail.ru">
+      </label>
+      <button class="btn tomato" type="submit">Прислать код</button>
+      <label class="field" for="authCode">Код из письма
+        <input id="authCode" inputmode="numeric" autocomplete="one-time-code" placeholder="123456">
+      </label>
+      <button id="authVerify" class="btn ghost" type="button">Войти по коду</button>
+      <p id="authMsg" class="note"></p>
+    </form>
+  </dialog>
+
+  <dialog id="paywall">
+    <div class="dialog-card">
+      <header class="dialog-head">
+        <h2>Лимит на сегодня</h2>
+        <button id="payClose" class="icon-btn" type="button" aria-label="Закрыть">✕</button>
+      </header>
+      <p>Бесплатно — 3 скана в день. Премиум снимает лимит.</p>
+      <div class="plans">
+        <article class="plan">
+          <h3>Месяц</h3>
+          <p class="plan-price">199 ₽</p>
+          <button class="btn ghost" type="button" data-plan="month">Оформить</button>
+        </article>
+        <article class="plan plan-year">
+          <p class="plan-badge">−46%</p>
+          <h3>Год</h3>
+          <p class="plan-price">1299 ₽</p>
+          <p class="muted">На 46% дешевле, чем 12 × 199 ₽</p>
+          <button class="btn tomato" type="button" data-plan="year">Оформить</button>
+        </article>
+      </div>
+      <p id="payNote" class="note warn" hidden></p>
+    </div>
+  </dialog>
+
+  <script src="config.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js"></script>
+  <script src="js/account.js"></script>
   <script src="js/app.js"></script>
 </body>
 </html>

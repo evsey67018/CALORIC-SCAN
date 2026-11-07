@@ -70,7 +70,12 @@ body {
 }
 
 .top, main, footer { position: relative; z-index: 1; width: min(920px, 100%); margin: 0 auto; }
-.top { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.top { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.top-actions { display: flex; align-items: center; justify-content: flex-end; gap: 4px; flex-wrap: wrap; }
+.nav-btn { margin-top: 0; min-height: 40px; padding: 6px 8px; }
+.nav-btn[aria-current="page"] { color: var(--ink); }
+.auth-email { font-size: 0.78rem; max-width: 9rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.quota { margin: -6px 0 14px; font-weight: 800; }
 .brand { display: flex; align-items: center; gap: 12px; min-width: 0; }
 .logo { display: grid; place-items: center; filter: drop-shadow(0 8px 12px rgba(214, 255, 74, 0.35)); }
 .eyebrow {
@@ -381,6 +386,36 @@ dialog::backdrop { background: rgba(16, 22, 16, 0.45); }
   border-radius: 24px;
   padding: 14px;
   border: 1px solid var(--stroke);
+}
+.field { display: grid; gap: 6px; margin: 10px 0; font-weight: 800; }
+.field input, .dialog-card input[type="email"], .dialog-card input[type="text"] {
+  min-height: 48px;
+  border-radius: 14px;
+  border: 1px solid var(--line);
+  padding: 10px 12px;
+  font: inherit;
+  background: rgba(255, 255, 255, 0.55);
+  color: var(--ink);
+}
+[data-theme="dark"] .field input { background: rgba(0, 0, 0, 0.2); }
+.plans { display: grid; gap: 10px; margin: 12px 0; }
+.plan { position: relative; padding: 12px; border-radius: 18px; border: 1px solid var(--line); }
+.plan-year { border-color: rgba(255, 77, 58, 0.45); }
+.plan-price { margin: 4px 0 8px; font-family: Unbounded, Manrope, sans-serif; font-size: 1.4rem; }
+.plan-badge {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  background: var(--lime);
+  color: #172010;
+  font-weight: 800;
+  border-radius: 999px;
+  padding: 4px 8px;
+  font-size: 0.78rem;
+}
+.day-head { background: transparent; border: 0; padding: 10px 2px 0; }
+@media (min-width: 720px) {
+  .plans { grid-template-columns: 1fr 1fr; }
 }
 #searchInput, .search-list { width: 100%; }
 #searchInput {

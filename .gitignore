@@ -7,3 +7,5 @@ training/_savedmodel/
 *.keras
 food-101/
 *.tar.gz
+worker/.dev.vars
+worker/.wrangler/

@@ -1,0 +1,6 @@
+# Скопируй в worker/.dev.vars для локального `wrangler dev`. Файл .dev.vars в git не коммитится.
+SUPABASE_URL=https://YOUR_PROJECT.supabase.co
+SUPABASE_ANON_KEY=YOUR_SUPABASE_ANON_KEY
+SUPABASE_SERVICE_ROLE_KEY=YOUR_SUPABASE_SERVICE_ROLE_KEY
+YOOKASSA_SHOP_ID=YOUR_SHOP_ID
+YOOKASSA_SECRET_KEY=YOUR_YOOKASSA_SECRET

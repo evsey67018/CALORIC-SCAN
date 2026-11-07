@@ -191,6 +191,10 @@ function drawDonut(protein, fat, carbs) {
 }
 
 function renderDiary() {
+  if (window.CaloricAccount?.renderDiary) {
+    window.CaloricAccount.renderDiary();
+    return;
+  }
   const data = loadDiary();
   const key = todayKey();
   const items = data.days[key] || [];
@@ -386,11 +390,18 @@ function renderMeal(meal, animate) {
   els.micro.textContent = micro.join(" · ");
 }
 
-function addToDiary() {
+async function addToDiary() {
   const meal = state.meal;
   if (!meal || !meal.rows.length) return;
+  if (window.CaloricAccount?.isLoggedIn()) {
+    await window.CaloricAccount.afterScan(meal);
+    burst(els.addBtn);
+    els.addBtn.textContent = "В дневнике ✓";
+    setTimeout(() => { els.addBtn.textContent = "Добавить в дневник"; }, 900);
+    return;
+  }
   const data = loadDiary();
-  const key = todayKey();
+  const key = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Moscow", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
   const names = meal.rows.map((row) => row.ru);
   data.days[key] = data.days[key] || [];
   data.days[key].push({
@@ -543,11 +554,12 @@ async function analyze(bitmap) {
   };
   if (!rows.length) {
     setError("Ингредиенты не разобрались. Попробуй другое фото.");
-    return;
+    return null;
   }
   setError("");
   renderMeal(meal, true);
   burst(els.resultCard);
+  return meal;
 }
 
 async function fileToBitmap(file) {
@@ -563,6 +575,14 @@ async function handleFile(file) {
     setError("Нейросеть ещё загружается.");
     return;
   }
+  if (!file || !file.type.startsWith("image/")) {
+    setError("Нужно фото: JPG, PNG или WEBP.");
+    return;
+  }
+  if (window.CaloricAccount) {
+    const allowed = await window.CaloricAccount.beforeScan();
+    if (!allowed) return;
+  }
   let bitmap;
   try {
     bitmap = await fileToBitmap(file);
@@ -571,7 +591,8 @@ async function handleFile(file) {
     return;
   }
   try {
-    await analyze(bitmap);
+    const meal = await analyze(bitmap);
+    if (meal && window.CaloricAccount) await window.CaloricAccount.afterScan(meal);
   } catch (err) {
     console.error(err);
     els.scanline.hidden = true;
@@ -666,9 +687,20 @@ els.goal.addEventListener("change", () => {
   saveDiary(data);
   renderDiary();
 });
-els.clearDay.addEventListener("click", () => {
+els.clearDay.addEventListener("click", async () => {
+  if (window.CaloricAccount?.isLoggedIn()) {
+    const day = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Moscow", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
+    const [year, month, date] = day.split("-").map(Number);
+    const start = new Date(Date.UTC(year, month - 1, date, -3, 0, 0)).toISOString();
+    const end = new Date(Date.UTC(year, month - 1, date, 21, 0, 0)).toISOString();
+    const client = window.CaloricAccount;
+    if (client.clearToday) await client.clearToday(start, end);
+    renderDiary();
+    return;
+  }
   const data = loadDiary();
-  data.days[todayKey()] = [];
+  const key = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Moscow", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
+  data.days[key] = [];
   saveDiary(data);
   renderDiary();
 });

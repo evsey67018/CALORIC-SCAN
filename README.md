@@ -56,6 +56,60 @@ python training/build_ingredients.py
 
 Подробности по Food-101 — в [training/README.md](training/README.md). `training/train_seg.py` не даст закоммитить голову блюда, если top-1 на официальном тесте уйдёт ниже 0,6106.
 
+## Аккаунт и подписка
+
+Бесплатно — **3 скана в день**. Премиум снимает лимит: **199 ₽ в месяц** или **1299 ₽ в год**. Год на 46% дешевле, чем 12 × 199 ₽ (2388 ₽).
+
+Пока в `config.js` стоят заглушки `YOUR_…`, вход не нужен: счётчик живёт в `localStorage` и обнуляется по московским суткам. Надпись «Осталось N из 3 сканов сегодня» видна над кнопкой фото. На четвёртом скане открывается окно с тарифами. Кнопка «Оформить» без платёжного воркера пишет «Оплата скоро будет доступна».
+
+Если войти по почте, сканы пишутся в Supabase, а экран «Дневник» показывает итог за сегодня (калории, белки, жиры, углеводы) и дни до этого. Пароля нет: письмо со ссылкой и кодом.
+
+### 1. Supabase
+
+1. Создай проект на [supabase.com](https://supabase.com).
+2. Authentication → Providers → Email: включи email, magic link / OTP. Шаблоны писем можно оставить стандартными: в письме есть и ссылка, и код.
+3. Authentication → URL Configuration → Site URL: `https://evsey67018.github.io/CALORIC-SCAN/`. В Redirect URLs добавь тот же адрес и, если проверяешь локально, `http://127.0.0.1:8765/`.
+4. SQL Editor → New query: вставь целиком `supabase/schema.sql` и нажми Run.
+5. Project Settings → API: скопируй Project URL и `anon` `public` key. `service_role` на сайт не клади.
+6. В `config.js` замени заглушки:
+
+```js
+window.CALORIC_CONFIG = {
+  supabaseUrl: "https://xxxx.supabase.co",
+  supabaseAnonKey: "eyJ...",
+  paymentWorkerUrl: "https://caloric-scan-pay.xxxx.workers.dev",
+};
+```
+
+Закоммить `config.js` с anon key можно: этот ключ и так виден в браузере. Лимит после входа считает функция `consume_scan` в базе, пользователь сам `plan` и `premium_until` не меняет.
+
+### 2. Cloudflare Worker
+
+Из папки `worker/`:
+
+```bash
+npx wrangler login
+npx wrangler secret put SUPABASE_URL
+npx wrangler secret put SUPABASE_ANON_KEY
+npx wrangler secret put SUPABASE_SERVICE_ROLE_KEY
+npx wrangler secret put YOOKASSA_SHOP_ID
+npx wrangler secret put YOOKASSA_SECRET_KEY
+npx wrangler deploy
+```
+
+`ALLOWED_ORIGINS` уже в `worker/wrangler.toml`. Локально секреты кладут в `worker/.dev.vars` (образец — `worker/.dev.vars.example`); этот файл в git не входит.
+
+Адрес воркера впиши в `config.js` → `paymentWorkerUrl`.
+
+### 3. ЮKassa
+
+1. В кабинете ЮKassa возьми `shopId` и секретный ключ. Это `YOOKASSA_SHOP_ID` и `YOOKASSA_SECRET_KEY` выше.
+2. HTTP-уведомления направь на `https://<воркер>/webhook` (событие `payment.succeeded`).
+3. Сайт вызывает `POST /create-payment` с планом `month` или `year`. Воркер создаёт платёж с `save_payment_method: true` (для будущего автопродления) и возвращает `confirmation_url`.
+4. В вебхуке статус из тела письма не используется. Воркер ещё раз запрашивает платёж у API ЮKassa и только если он `succeeded`, сумма совпала с тарифом и платёж есть в таблице `payments`, ставит `plan = premium` и `premium_until` (месяц или год, продлевая уже оплаченный срок).
+
+Пока ключей нет, воркер отвечает 501, а кнопка показывает «Оплата скоро будет доступна».
+
 ## Ограничения
 
 - 103 ингредиента FoodSeg103, не вся еда. mIoU 13% — это грубая маска: лишний класс (на фото риса с курицей вылез «картофель») и пропуски бывают часто.
