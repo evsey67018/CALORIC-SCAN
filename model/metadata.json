@@ -1,0 +1,11 @@
+{
+  "version": "v1",
+  "backbone": "MobileNetV2",
+  "pretrained": "imagenet",
+  "img_size": 160,
+  "quantize": "float16",
+  "test_top1": 0.6106,
+  "test_top5": 0.8546,
+  "test_images": 25250,
+  "train_images": 73730
+}

@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Caloric Scan — калории по фото</title>
+  <meta name="description" content="Сфотографируй еду — Caloric Scan узнает блюдо своей нейросетью и посчитает калории прямо в браузере.">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect rx='16' width='64' height='64' fill='%23d6ff4a'/%3E%3Ccircle cx='32' cy='34' r='14' fill='none' stroke='%23182416' stroke-width='4'/%3E%3Cpath d='M18 22h28' stroke='%23ff4d3a' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Unbounded:wght@500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+  <div class="bg-emoji" aria-hidden="true">
+    <span style="--x:6%;--y:18%;--r:-8deg">🍋</span>
+    <span style="--x:86%;--y:12%;--r:10deg">🍅</span>
+    <span style="--x:78%;--y:70%;--r:6deg">🥑</span>
+    <span style="--x:8%;--y:78%;--r:-12deg">🍓</span>
+    <span style="--x:48%;--y:8%;--r:4deg">🥐</span>
+  </div>
+
+  <header class="top">
+    <div class="brand">
+      <span class="logo" aria-hidden="true">
+        <svg viewBox="0 0 48 48" width="48" height="48">
+          <rect x="2" y="2" width="44" height="44" rx="14" fill="#d6ff4a"/>
+          <circle cx="24" cy="26" r="11" fill="none" stroke="#182416" stroke-width="2.4"/>
+          <path d="M14 16h20" stroke="#ff4d3a" stroke-width="2.6" stroke-linecap="round"/>
+          <path d="M30 12l3 4" stroke="#182416" stroke-width="2.2" stroke-linecap="round"/>
+        </svg>
+      </span>
+      <div>
+        <p class="eyebrow">нейросеть в браузере</p>
+        <h1>Caloric Scan</h1>
+      </div>
+    </div>
+    <button id="themeBtn" class="icon-btn" type="button" aria-pressed="false" aria-label="Включить тёмную тему">🌙</button>
+  </header>
+
+  <main>
+    <p class="lead">Сфоткай тарелку — скажем, что это, и посчитаем калории. Без сервера и без чужого ИИ: модель живёт у тебя в браузере.</p>
+
+    <section class="card upload" id="dropzone">
+      <div class="upload-art" aria-hidden="true">📸</div>
+      <h2>Брось фото сюда</h2>
+      <p class="muted">JPG, PNG или WEBP. Можно перетащить файл.</p>
+      <div class="load" id="loadBox">
+        <div class="load-track"><span id="loadFill"></span></div>
+        <p id="loadText">Загружаем нейросеть…</p>
+      </div>
+      <div class="actions">
+        <button id="pickBtn" class="btn lime" type="button">Выбрать файл</button>
+        <button id="shotBtn" class="btn tomato" type="button">Сфоткать</button>
+      </div>
+      <button id="manualOpen" class="text-btn" type="button">Или выбрать блюдо из списка</button>
+      <p id="formError" class="alert" hidden></p>
+      <input id="file" type="file" accept="image/*" hidden>
+      <input id="shotFile" type="file" accept="image/*" capture="environment" hidden>
+    </section>
+
+    <section id="result" class="result" hidden>
+      <figure class="photo-card" id="photoCard" hidden>
+        <img id="photo" alt="Загруженное фото еды">
+        <div class="scanline" id="scanline" hidden></div>
+        <figcaption id="photoStatus" hidden>Смотрим, что на тарелке…</figcaption>
+      </figure>
+
+      <article class="card result-card" id="resultCard" hidden>
+        <p id="lowConf" class="alert" hidden></p>
+        <header class="dish-head">
+          <div>
+            <h2 id="dishRu">—</h2>
+            <p id="dishEn" class="en"></p>
+          </div>
+          <p id="confPill" class="pill">—</p>
+        </header>
+        <p class="alts-label" id="altsLabel">Похожие варианты — нажми, если это оно</p>
+        <div id="alts" class="alts"></div>
+
+        <label class="portion" for="gramsRange">
+          <span>Порция, граммы</span>
+          <span class="portion-row">
+            <input id="gramsRange" type="range" min="20" max="1000" step="5" value="200" aria-valuemin="20" aria-valuemax="1000">
+            <input id="gramsNum" type="number" min="10" max="1500" step="5" value="200" inputmode="numeric" aria-label="Порция в граммах">
+          </span>
+        </label>
+        <p id="per100" class="muted per100"></p>
+
+        <div class="macro">
+          <div class="stats">
+            <div class="stat kcal"><b id="vKcal">0</b><span>Калории</span></div>
+            <div class="stat protein"><b id="vP">0</b><span>Белки, г</span></div>
+            <div class="stat fat"><b id="vF">0</b><span>Жиры, г</span></div>
+            <div class="stat carb"><b id="vC">0</b><span>Углеводы, г</span></div>
+          </div>
+          <div class="donut-box">
+            <svg id="donut" viewBox="0 0 120 120" role="img" aria-label="Доля калорий из белков, жиров и углеводов">
+              <circle cx="60" cy="60" r="46" class="donut-track"></circle>
+              <g id="donutSegs" transform="rotate(-90 60 60)"></g>
+              <text x="60" y="58" text-anchor="middle" class="donut-kicker">БЖУ</text>
+              <text id="donutMid" x="60" y="76" text-anchor="middle" class="donut-mid">—</text>
+            </svg>
+            <ul class="legend">
+              <li><i class="sw p"></i> Белки</li>
+              <li><i class="sw f"></i> Жиры</li>
+              <li><i class="sw c"></i> Углеводы</li>
+            </ul>
+          </div>
+        </div>
+        <p id="micro" class="micro"></p>
+        <div class="actions">
+          <button id="addBtn" class="btn tomato" type="button">Добавить в дневник</button>
+          <button id="fixBtn" class="btn ghost" type="button">Не то блюдо?</button>
+        </div>
+        <p class="note">Калории приблизительные: это средний состав на 100 г, а на фото может быть другой рецепт, соус или размер. Не медицинская консультация.</p>
+      </article>
+    </section>
+
+    <section class="card diary" id="diary">
+      <div class="diary-head">
+        <div>
+          <p class="eyebrow">сегодня</p>
+          <h2 id="diaryTitle">Дневник</h2>
+        </div>
+        <button id="clearDay" class="text-btn" type="button">Очистить день</button>
+      </div>
+      <p class="goal-row">
+        <label for="goal">Цель, ккал</label>
+        <input id="goal" type="number" min="800" max="8000" step="50" value="2000">
+      </p>
+      <div class="bar" aria-hidden="true"><span id="goalFill"></span></div>
+      <p id="goalText" class="goal-text">0 из 2000 ккал</p>
+      <p id="dayMacros" class="muted"></p>
+      <ul id="diaryList" class="diary-list"></ul>
+      <p id="diaryEmpty" class="muted">Пока пусто — первая тарелка ещё впереди.</p>
+    </section>
+  </main>
+
+  <footer>
+    <p id="modelNote" class="muted"></p>
+    <p class="muted">Caloric Scan считает на устройстве. Фото никуда не отправляется.</p>
+  </footer>
+
+  <dialog id="searchDialog">
+    <form method="dialog" class="dialog-card">
+      <header class="dialog-head">
+        <h2>Все 101 блюдо</h2>
+        <button class="icon-btn" value="cancel" type="submit" aria-label="Закрыть">✕</button>
+      </header>
+      <input id="searchInput" type="search" placeholder="Пицца, суши, суп, cake…" autocomplete="off" enterkeyhint="search">
+      <div id="searchList" class="search-list"></div>
+    </form>
+  </dialog>
+
+  <dialog id="cameraDialog">
+    <div class="dialog-card cam">
+      <header class="dialog-head">
+        <h2>Камера</h2>
+        <button id="closeCam" class="icon-btn" type="button" aria-label="Закрыть камеру">✕</button>
+      </header>
+      <video id="video" autoplay playsinline muted></video>
+      <div class="actions">
+        <button id="shutter" class="btn tomato" type="button">Снять</button>
+        <button id="useFileCam" class="btn ghost" type="button">Файл с камеры</button>
+      </div>
+      <p id="camError" class="alert" hidden></p>
+    </div>
+  </dialog>
+
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

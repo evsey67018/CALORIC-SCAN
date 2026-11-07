@@ -1,0 +1,507 @@
+[
+  {
+    "id": "apple_pie",
+    "ru": "Яблочный пирог",
+    "en": "Apple pie"
+  },
+  {
+    "id": "baby_back_ribs",
+    "ru": "Свиные рёбрышки",
+    "en": "Baby back ribs"
+  },
+  {
+    "id": "baklava",
+    "ru": "Пахлава",
+    "en": "Baklava"
+  },
+  {
+    "id": "beef_carpaccio",
+    "ru": "Карпаччо из говядины",
+    "en": "Beef carpaccio"
+  },
+  {
+    "id": "beef_tartare",
+    "ru": "Тартар из говядины",
+    "en": "Beef tartare"
+  },
+  {
+    "id": "beet_salad",
+    "ru": "Свекольный салат",
+    "en": "Beet salad"
+  },
+  {
+    "id": "beignets",
+    "ru": "Бенье",
+    "en": "Beignets"
+  },
+  {
+    "id": "bibimbap",
+    "ru": "Пибимпап",
+    "en": "Bibimbap"
+  },
+  {
+    "id": "bread_pudding",
+    "ru": "Хлебный пудинг",
+    "en": "Bread pudding"
+  },
+  {
+    "id": "breakfast_burrito",
+    "ru": "Утреннее буррито",
+    "en": "Breakfast burrito"
+  },
+  {
+    "id": "bruschetta",
+    "ru": "Брускетта",
+    "en": "Bruschetta"
+  },
+  {
+    "id": "caesar_salad",
+    "ru": "Салат Цезарь",
+    "en": "Caesar salad"
+  },
+  {
+    "id": "cannoli",
+    "ru": "Канноли",
+    "en": "Cannoli"
+  },
+  {
+    "id": "caprese_salad",
+    "ru": "Салат Капрезе",
+    "en": "Caprese salad"
+  },
+  {
+    "id": "carrot_cake",
+    "ru": "Морковный торт",
+    "en": "Carrot cake"
+  },
+  {
+    "id": "ceviche",
+    "ru": "Севиче",
+    "en": "Ceviche"
+  },
+  {
+    "id": "cheesecake",
+    "ru": "Чизкейк",
+    "en": "Cheesecake"
+  },
+  {
+    "id": "cheese_plate",
+    "ru": "Сырная тарелка",
+    "en": "Cheese plate"
+  },
+  {
+    "id": "chicken_curry",
+    "ru": "Курица карри",
+    "en": "Chicken curry"
+  },
+  {
+    "id": "chicken_quesadilla",
+    "ru": "Кесадилья с курицей",
+    "en": "Chicken quesadilla"
+  },
+  {
+    "id": "chicken_wings",
+    "ru": "Куриные крылышки",
+    "en": "Chicken wings"
+  },
+  {
+    "id": "chocolate_cake",
+    "ru": "Шоколадный торт",
+    "en": "Chocolate cake"
+  },
+  {
+    "id": "chocolate_mousse",
+    "ru": "Шоколадный мусс",
+    "en": "Chocolate mousse"
+  },
+  {
+    "id": "churros",
+    "ru": "Чуррос",
+    "en": "Churros"
+  },
+  {
+    "id": "clam_chowder",
+    "ru": "Суп из моллюсков",
+    "en": "Clam chowder"
+  },
+  {
+    "id": "club_sandwich",
+    "ru": "Клаб-сэндвич",
+    "en": "Club sandwich"
+  },
+  {
+    "id": "crab_cakes",
+    "ru": "Крабовые котлеты",
+    "en": "Crab cakes"
+  },
+  {
+    "id": "creme_brulee",
+    "ru": "Крем-брюле",
+    "en": "Crème brûlée"
+  },
+  {
+    "id": "croque_madame",
+    "ru": "Крок-мадам",
+    "en": "Croque madame"
+  },
+  {
+    "id": "cup_cakes",
+    "ru": "Капкейки",
+    "en": "Cupcakes"
+  },
+  {
+    "id": "deviled_eggs",
+    "ru": "Фаршированные яйца",
+    "en": "Deviled eggs"
+  },
+  {
+    "id": "donuts",
+    "ru": "Пончики",
+    "en": "Donuts"
+  },
+  {
+    "id": "dumplings",
+    "ru": "Дамплинги",
+    "en": "Dumplings"
+  },
+  {
+    "id": "edamame",
+    "ru": "Эдамаме",
+    "en": "Edamame"
+  },
+  {
+    "id": "eggs_benedict",
+    "ru": "Яйца Бенедикт",
+    "en": "Eggs Benedict"
+  },
+  {
+    "id": "escargots",
+    "ru": "Улитки",
+    "en": "Escargots"
+  },
+  {
+    "id": "falafel",
+    "ru": "Фалафель",
+    "en": "Falafel"
+  },
+  {
+    "id": "filet_mignon",
+    "ru": "Филе-миньон",
+    "en": "Filet mignon"
+  },
+  {
+    "id": "fish_and_chips",
+    "ru": "Рыба с картофелем фри",
+    "en": "Fish and chips"
+  },
+  {
+    "id": "foie_gras",
+    "ru": "Фуа-гра",
+    "en": "Foie gras"
+  },
+  {
+    "id": "french_fries",
+    "ru": "Картофель фри",
+    "en": "French fries"
+  },
+  {
+    "id": "french_onion_soup",
+    "ru": "Французский луковый суп",
+    "en": "French onion soup"
+  },
+  {
+    "id": "french_toast",
+    "ru": "Французские тосты",
+    "en": "French toast"
+  },
+  {
+    "id": "fried_calamari",
+    "ru": "Жареные кальмары",
+    "en": "Fried calamari"
+  },
+  {
+    "id": "fried_rice",
+    "ru": "Жареный рис",
+    "en": "Fried rice"
+  },
+  {
+    "id": "frozen_yogurt",
+    "ru": "Замороженный йогурт",
+    "en": "Frozen yogurt"
+  },
+  {
+    "id": "garlic_bread",
+    "ru": "Чесночный хлеб",
+    "en": "Garlic bread"
+  },
+  {
+    "id": "gnocchi",
+    "ru": "Ньокки",
+    "en": "Gnocchi"
+  },
+  {
+    "id": "greek_salad",
+    "ru": "Греческий салат",
+    "en": "Greek salad"
+  },
+  {
+    "id": "grilled_cheese_sandwich",
+    "ru": "Сэндвич с сыром",
+    "en": "Grilled cheese sandwich"
+  },
+  {
+    "id": "grilled_salmon",
+    "ru": "Лосось на гриле",
+    "en": "Grilled salmon"
+  },
+  {
+    "id": "guacamole",
+    "ru": "Гуакамоле",
+    "en": "Guacamole"
+  },
+  {
+    "id": "gyoza",
+    "ru": "Гёдза",
+    "en": "Gyoza"
+  },
+  {
+    "id": "hamburger",
+    "ru": "Гамбургер",
+    "en": "Hamburger"
+  },
+  {
+    "id": "hot_and_sour_soup",
+    "ru": "Кисло-острый суп",
+    "en": "Hot and sour soup"
+  },
+  {
+    "id": "hot_dog",
+    "ru": "Хот-дог",
+    "en": "Hot dog"
+  },
+  {
+    "id": "huevos_rancheros",
+    "ru": "Яичница по-мексикански",
+    "en": "Huevos rancheros"
+  },
+  {
+    "id": "hummus",
+    "ru": "Хумус",
+    "en": "Hummus"
+  },
+  {
+    "id": "ice_cream",
+    "ru": "Мороженое",
+    "en": "Ice cream"
+  },
+  {
+    "id": "lasagna",
+    "ru": "Лазанья",
+    "en": "Lasagna"
+  },
+  {
+    "id": "lobster_bisque",
+    "ru": "Биск из омара",
+    "en": "Lobster bisque"
+  },
+  {
+    "id": "lobster_roll_sandwich",
+    "ru": "Ролл с омаром",
+    "en": "Lobster roll"
+  },
+  {
+    "id": "macaroni_and_cheese",
+    "ru": "Макароны с сыром",
+    "en": "Macaroni and cheese"
+  },
+  {
+    "id": "macarons",
+    "ru": "Макаруны",
+    "en": "Macarons"
+  },
+  {
+    "id": "miso_soup",
+    "ru": "Суп мисо",
+    "en": "Miso soup"
+  },
+  {
+    "id": "mussels",
+    "ru": "Мидии",
+    "en": "Mussels"
+  },
+  {
+    "id": "nachos",
+    "ru": "Начос",
+    "en": "Nachos"
+  },
+  {
+    "id": "omelette",
+    "ru": "Омлет",
+    "en": "Omelette"
+  },
+  {
+    "id": "onion_rings",
+    "ru": "Луковые кольца",
+    "en": "Onion rings"
+  },
+  {
+    "id": "oysters",
+    "ru": "Устрицы",
+    "en": "Oysters"
+  },
+  {
+    "id": "pad_thai",
+    "ru": "Пад тай",
+    "en": "Pad Thai"
+  },
+  {
+    "id": "paella",
+    "ru": "Паэлья",
+    "en": "Paella"
+  },
+  {
+    "id": "pancakes",
+    "ru": "Панкейки",
+    "en": "Pancakes"
+  },
+  {
+    "id": "panna_cotta",
+    "ru": "Панна-котта",
+    "en": "Panna cotta"
+  },
+  {
+    "id": "peking_duck",
+    "ru": "Утка по-пекински",
+    "en": "Peking duck"
+  },
+  {
+    "id": "pho",
+    "ru": "Фо",
+    "en": "Pho"
+  },
+  {
+    "id": "pizza",
+    "ru": "Пицца",
+    "en": "Pizza"
+  },
+  {
+    "id": "pork_chop",
+    "ru": "Свиная отбивная",
+    "en": "Pork chop"
+  },
+  {
+    "id": "poutine",
+    "ru": "Путин",
+    "en": "Poutine"
+  },
+  {
+    "id": "prime_rib",
+    "ru": "Прайм-риб",
+    "en": "Prime rib"
+  },
+  {
+    "id": "pulled_pork_sandwich",
+    "ru": "Сэндвич с томлёной свининой",
+    "en": "Pulled pork sandwich"
+  },
+  {
+    "id": "ramen",
+    "ru": "Рамен",
+    "en": "Ramen"
+  },
+  {
+    "id": "ravioli",
+    "ru": "Равиоли",
+    "en": "Ravioli"
+  },
+  {
+    "id": "red_velvet_cake",
+    "ru": "Торт «Красный бархат»",
+    "en": "Red velvet cake"
+  },
+  {
+    "id": "risotto",
+    "ru": "Ризотто",
+    "en": "Risotto"
+  },
+  {
+    "id": "samosa",
+    "ru": "Самоса",
+    "en": "Samosa"
+  },
+  {
+    "id": "sashimi",
+    "ru": "Сашими",
+    "en": "Sashimi"
+  },
+  {
+    "id": "scallops",
+    "ru": "Морские гребешки",
+    "en": "Scallops"
+  },
+  {
+    "id": "seaweed_salad",
+    "ru": "Салат из водорослей",
+    "en": "Seaweed salad"
+  },
+  {
+    "id": "shrimp_and_grits",
+    "ru": "Креветки с кукурузной кашей",
+    "en": "Shrimp and grits"
+  },
+  {
+    "id": "spaghetti_bolognese",
+    "ru": "Спагетти болоньезе",
+    "en": "Spaghetti Bolognese"
+  },
+  {
+    "id": "spaghetti_carbonara",
+    "ru": "Спагетти карбонара",
+    "en": "Spaghetti carbonara"
+  },
+  {
+    "id": "spring_rolls",
+    "ru": "Спринг-роллы",
+    "en": "Spring rolls"
+  },
+  {
+    "id": "steak",
+    "ru": "Стейк",
+    "en": "Steak"
+  },
+  {
+    "id": "strawberry_shortcake",
+    "ru": "Клубничный бисквит",
+    "en": "Strawberry shortcake"
+  },
+  {
+    "id": "sushi",
+    "ru": "Суши",
+    "en": "Sushi"
+  },
+  {
+    "id": "tacos",
+    "ru": "Тако",
+    "en": "Tacos"
+  },
+  {
+    "id": "takoyaki",
+    "ru": "Такояки",
+    "en": "Takoyaki"
+  },
+  {
+    "id": "tiramisu",
+    "ru": "Тирамису",
+    "en": "Tiramisu"
+  },
+  {
+    "id": "tuna_tartare",
+    "ru": "Тартар из тунца",
+    "en": "Tuna tartare"
+  },
+  {
+    "id": "waffles",
+    "ru": "Вафли",
+    "en": "Waffles"
+  }
+]

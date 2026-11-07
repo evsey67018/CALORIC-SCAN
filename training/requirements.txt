@@ -1,0 +1,5 @@
+tensorflow==2.21.0
+tf_keras==2.21.0
+tensorflowjs==4.22.0
+numpy>=1.26
+packaging>=23

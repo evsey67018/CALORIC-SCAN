@@ -1,0 +1,558 @@
+{
+  "date": "2026-11-07",
+  "tensorflow": "2.21.0",
+  "backbone": "MobileNetV2",
+  "pretrained": "imagenet",
+  "img_size": 160,
+  "train_images": 73730,
+  "val_images": 2020,
+  "test_images": 25250,
+  "test_split": "official Food-101 test",
+  "limit_per_class": 0,
+  "holdout_per_class": 20,
+  "test_per_class": 0,
+  "head_epochs_ran": 21,
+  "internal_val_top1": 0.5762,
+  "internal_val_top5": 0.8074,
+  "test_top1": 0.6106,
+  "test_top5": 0.8546,
+  "finetune": {
+    "epochs": 2,
+    "images": 73730,
+    "unfrozen_layers": 12,
+    "lr": 0.0001,
+    "val_top1_before": 0.5762,
+    "val_top1_after": 0.2678,
+    "val_top5_after": 0.5995,
+    "kept": "head",
+    "layer_probe": "block_15_expand",
+    "weight_l1_delta": 37.839844,
+    "note": "Дообучение последних блоков при lr=1e-4 подняло train accuracy до 0.76, но уронило внутреннюю проверку с 0.58 до 0.27. В модель на сайте взята голова на замороженном MobileNetV2 — у неё проверка выше."
+  },
+  "conversion": {
+    "files": [
+      {
+        "file": "group1-shard1of2.bin",
+        "bytes": 4194304
+      },
+      {
+        "file": "group1-shard2of2.bin",
+        "bytes": 478230
+      },
+      {
+        "file": "model.json",
+        "bytes": 116648
+      }
+    ],
+    "bytes": 4789182,
+    "quantize": "float16"
+  },
+  "per_class_test_top1": [
+    {
+      "id": "apple_pie",
+      "n": 250,
+      "top1": 0.268
+    },
+    {
+      "id": "baby_back_ribs",
+      "n": 250,
+      "top1": 0.612
+    },
+    {
+      "id": "baklava",
+      "n": 250,
+      "top1": 0.56
+    },
+    {
+      "id": "beef_carpaccio",
+      "n": 250,
+      "top1": 0.708
+    },
+    {
+      "id": "beef_tartare",
+      "n": 250,
+      "top1": 0.516
+    },
+    {
+      "id": "beet_salad",
+      "n": 250,
+      "top1": 0.492
+    },
+    {
+      "id": "beignets",
+      "n": 250,
+      "top1": 0.764
+    },
+    {
+      "id": "bibimbap",
+      "n": 250,
+      "top1": 0.772
+    },
+    {
+      "id": "bread_pudding",
+      "n": 250,
+      "top1": 0.28
+    },
+    {
+      "id": "breakfast_burrito",
+      "n": 250,
+      "top1": 0.468
+    },
+    {
+      "id": "bruschetta",
+      "n": 250,
+      "top1": 0.376
+    },
+    {
+      "id": "caesar_salad",
+      "n": 250,
+      "top1": 0.708
+    },
+    {
+      "id": "cannoli",
+      "n": 250,
+      "top1": 0.616
+    },
+    {
+      "id": "caprese_salad",
+      "n": 250,
+      "top1": 0.536
+    },
+    {
+      "id": "carrot_cake",
+      "n": 250,
+      "top1": 0.6
+    },
+    {
+      "id": "ceviche",
+      "n": 250,
+      "top1": 0.356
+    },
+    {
+      "id": "cheesecake",
+      "n": 250,
+      "top1": 0.468
+    },
+    {
+      "id": "cheese_plate",
+      "n": 250,
+      "top1": 0.608
+    },
+    {
+      "id": "chicken_curry",
+      "n": 250,
+      "top1": 0.452
+    },
+    {
+      "id": "chicken_quesadilla",
+      "n": 250,
+      "top1": 0.592
+    },
+    {
+      "id": "chicken_wings",
+      "n": 250,
+      "top1": 0.7
+    },
+    {
+      "id": "chocolate_cake",
+      "n": 250,
+      "top1": 0.572
+    },
+    {
+      "id": "chocolate_mousse",
+      "n": 250,
+      "top1": 0.436
+    },
+    {
+      "id": "churros",
+      "n": 250,
+      "top1": 0.708
+    },
+    {
+      "id": "clam_chowder",
+      "n": 250,
+      "top1": 0.784
+    },
+    {
+      "id": "club_sandwich",
+      "n": 250,
+      "top1": 0.66
+    },
+    {
+      "id": "crab_cakes",
+      "n": 250,
+      "top1": 0.412
+    },
+    {
+      "id": "creme_brulee",
+      "n": 250,
+      "top1": 0.764
+    },
+    {
+      "id": "croque_madame",
+      "n": 250,
+      "top1": 0.652
+    },
+    {
+      "id": "cup_cakes",
+      "n": 250,
+      "top1": 0.776
+    },
+    {
+      "id": "deviled_eggs",
+      "n": 250,
+      "top1": 0.712
+    },
+    {
+      "id": "donuts",
+      "n": 250,
+      "top1": 0.664
+    },
+    {
+      "id": "dumplings",
+      "n": 250,
+      "top1": 0.836
+    },
+    {
+      "id": "edamame",
+      "n": 250,
+      "top1": 0.96
+    },
+    {
+      "id": "eggs_benedict",
+      "n": 250,
+      "top1": 0.692
+    },
+    {
+      "id": "escargots",
+      "n": 250,
+      "top1": 0.708
+    },
+    {
+      "id": "falafel",
+      "n": 250,
+      "top1": 0.512
+    },
+    {
+      "id": "filet_mignon",
+      "n": 250,
+      "top1": 0.416
+    },
+    {
+      "id": "fish_and_chips",
+      "n": 250,
+      "top1": 0.668
+    },
+    {
+      "id": "foie_gras",
+      "n": 250,
+      "top1": 0.344
+    },
+    {
+      "id": "french_fries",
+      "n": 250,
+      "top1": 0.804
+    },
+    {
+      "id": "french_onion_soup",
+      "n": 250,
+      "top1": 0.756
+    },
+    {
+      "id": "french_toast",
+      "n": 250,
+      "top1": 0.48
+    },
+    {
+      "id": "fried_calamari",
+      "n": 250,
+      "top1": 0.6
+    },
+    {
+      "id": "fried_rice",
+      "n": 250,
+      "top1": 0.644
+    },
+    {
+      "id": "frozen_yogurt",
+      "n": 250,
+      "top1": 0.8
+    },
+    {
+      "id": "garlic_bread",
+      "n": 250,
+      "top1": 0.596
+    },
+    {
+      "id": "gnocchi",
+      "n": 250,
+      "top1": 0.448
+    },
+    {
+      "id": "greek_salad",
+      "n": 250,
+      "top1": 0.64
+    },
+    {
+      "id": "grilled_cheese_sandwich",
+      "n": 250,
+      "top1": 0.508
+    },
+    {
+      "id": "grilled_salmon",
+      "n": 250,
+      "top1": 0.424
+    },
+    {
+      "id": "guacamole",
+      "n": 250,
+      "top1": 0.732
+    },
+    {
+      "id": "gyoza",
+      "n": 250,
+      "top1": 0.608
+    },
+    {
+      "id": "hamburger",
+      "n": 250,
+      "top1": 0.568
+    },
+    {
+      "id": "hot_and_sour_soup",
+      "n": 250,
+      "top1": 0.872
+    },
+    {
+      "id": "hot_dog",
+      "n": 250,
+      "top1": 0.76
+    },
+    {
+      "id": "huevos_rancheros",
+      "n": 250,
+      "top1": 0.376
+    },
+    {
+      "id": "hummus",
+      "n": 250,
+      "top1": 0.404
+    },
+    {
+      "id": "ice_cream",
+      "n": 250,
+      "top1": 0.588
+    },
+    {
+      "id": "lasagna",
+      "n": 250,
+      "top1": 0.524
+    },
+    {
+      "id": "lobster_bisque",
+      "n": 250,
+      "top1": 0.764
+    },
+    {
+      "id": "lobster_roll_sandwich",
+      "n": 250,
+      "top1": 0.716
+    },
+    {
+      "id": "macaroni_and_cheese",
+      "n": 250,
+      "top1": 0.644
+    },
+    {
+      "id": "macarons",
+      "n": 250,
+      "top1": 0.896
+    },
+    {
+      "id": "miso_soup",
+      "n": 250,
+      "top1": 0.824
+    },
+    {
+      "id": "mussels",
+      "n": 250,
+      "top1": 0.78
+    },
+    {
+      "id": "nachos",
+      "n": 250,
+      "top1": 0.492
+    },
+    {
+      "id": "omelette",
+      "n": 250,
+      "top1": 0.356
+    },
+    {
+      "id": "onion_rings",
+      "n": 250,
+      "top1": 0.82
+    },
+    {
+      "id": "oysters",
+      "n": 250,
+      "top1": 0.832
+    },
+    {
+      "id": "pad_thai",
+      "n": 250,
+      "top1": 0.78
+    },
+    {
+      "id": "paella",
+      "n": 250,
+      "top1": 0.644
+    },
+    {
+      "id": "pancakes",
+      "n": 250,
+      "top1": 0.604
+    },
+    {
+      "id": "panna_cotta",
+      "n": 250,
+      "top1": 0.524
+    },
+    {
+      "id": "peking_duck",
+      "n": 250,
+      "top1": 0.612
+    },
+    {
+      "id": "pho",
+      "n": 250,
+      "top1": 0.852
+    },
+    {
+      "id": "pizza",
+      "n": 250,
+      "top1": 0.82
+    },
+    {
+      "id": "pork_chop",
+      "n": 250,
+      "top1": 0.336
+    },
+    {
+      "id": "poutine",
+      "n": 250,
+      "top1": 0.68
+    },
+    {
+      "id": "prime_rib",
+      "n": 250,
+      "top1": 0.672
+    },
+    {
+      "id": "pulled_pork_sandwich",
+      "n": 250,
+      "top1": 0.524
+    },
+    {
+      "id": "ramen",
+      "n": 250,
+      "top1": 0.668
+    },
+    {
+      "id": "ravioli",
+      "n": 250,
+      "top1": 0.328
+    },
+    {
+      "id": "red_velvet_cake",
+      "n": 250,
+      "top1": 0.772
+    },
+    {
+      "id": "risotto",
+      "n": 250,
+      "top1": 0.464
+    },
+    {
+      "id": "samosa",
+      "n": 250,
+      "top1": 0.624
+    },
+    {
+      "id": "sashimi",
+      "n": 250,
+      "top1": 0.788
+    },
+    {
+      "id": "scallops",
+      "n": 250,
+      "top1": 0.356
+    },
+    {
+      "id": "seaweed_salad",
+      "n": 250,
+      "top1": 0.784
+    },
+    {
+      "id": "shrimp_and_grits",
+      "n": 250,
+      "top1": 0.524
+    },
+    {
+      "id": "spaghetti_bolognese",
+      "n": 250,
+      "top1": 0.768
+    },
+    {
+      "id": "spaghetti_carbonara",
+      "n": 250,
+      "top1": 0.832
+    },
+    {
+      "id": "spring_rolls",
+      "n": 250,
+      "top1": 0.608
+    },
+    {
+      "id": "steak",
+      "n": 250,
+      "top1": 0.308
+    },
+    {
+      "id": "strawberry_shortcake",
+      "n": 250,
+      "top1": 0.648
+    },
+    {
+      "id": "sushi",
+      "n": 250,
+      "top1": 0.552
+    },
+    {
+      "id": "tacos",
+      "n": 250,
+      "top1": 0.468
+    },
+    {
+      "id": "takoyaki",
+      "n": 250,
+      "top1": 0.584
+    },
+    {
+      "id": "tiramisu",
+      "n": 250,
+      "top1": 0.484
+    },
+    {
+      "id": "tuna_tartare",
+      "n": 250,
+      "top1": 0.368
+    },
+    {
+      "id": "waffles",
+      "n": 250,
+      "top1": 0.708
+    }
+  ],
+  "note": "test_top1/test_top5 измерены на официальном test-сплите Food-101, который не использовался для обучения и выбора чекпоинта. internal_val — 20 фото на класс из train."
+}
