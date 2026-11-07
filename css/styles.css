@@ -420,6 +420,10 @@ dialog::backdrop { background: rgba(16, 22, 16, 0.45); }
   letter-spacing: 0.08em;
 }
 [data-theme="dark"] .sbp-brand { color: #d6c7ff; }
+.renew[hidden],
+.analyze[hidden],
+.retry[hidden],
+#authCodeBlock[hidden] { display: none !important; }
 .renew {
   display: block;
   width: 100%;
@@ -434,6 +438,23 @@ dialog::backdrop { background: rgba(16, 22, 16, 0.45); }
   color: #172010;
   background: linear-gradient(90deg, #efe6ff, #d6ff4a);
 }
+.analyze {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 12px 0;
+  font-weight: 800;
+}
+.spinner {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 3px solid rgba(27, 36, 24, 0.15);
+  border-top-color: #ff4d3a;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.retry { margin: 8px 0 14px; }
 .plan-badge {
   position: absolute;
   top: 10px;

@@ -60,8 +60,13 @@
         <p id="loadText">Загружаем нейросеть…</p>
       </div>
       <span class="btn tomato add-label">Добавить фото</span>
-      <p id="formError" class="alert" hidden></p>
     </label>
+    <div id="analyzeBar" class="analyze" hidden>
+      <span class="spinner" aria-hidden="true"></span>
+      <span id="analyzeText">Анализирую…</span>
+    </div>
+    <p id="formError" class="alert" hidden></p>
+    <button id="retryBtn" class="btn ghost retry" type="button" hidden>Попробовать ещё раз</button>
 
     <section id="result" class="result" hidden>
       <figure class="photo-card" id="photoCard" hidden>
@@ -140,15 +145,17 @@
         <h2>Вход по почте</h2>
         <button id="authClose" class="icon-btn" type="button" aria-label="Закрыть">✕</button>
       </header>
-      <p class="muted">Без пароля: пришлём ссылку и код. Открой ссылку или введи код здесь.</p>
+      <p class="muted">Без пароля. На почту придёт код из 6 цифр.</p>
       <label class="field" for="authEmail">Почта
         <input id="authEmail" type="email" required autocomplete="email" placeholder="you@mail.ru">
       </label>
-      <button class="btn tomato" type="submit">Прислать код</button>
-      <label class="field" for="authCode">Код из письма
-        <input id="authCode" inputmode="numeric" autocomplete="one-time-code" placeholder="123456">
-      </label>
-      <button id="authVerify" class="btn ghost" type="button">Войти по коду</button>
+      <button id="authSend" class="btn tomato" type="submit">Получить код</button>
+      <div id="authCodeBlock" hidden>
+        <label class="field" for="authCode">Код из письма
+          <input id="authCode" inputmode="numeric" autocomplete="one-time-code" maxlength="6" pattern="[0-9]{6}" placeholder="123456">
+        </label>
+        <button id="authVerify" class="btn ghost" type="button">Войти</button>
+      </div>
       <p id="authMsg" class="note"></p>
     </form>
   </dialog>
@@ -198,6 +205,7 @@
 
   <script src="config.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-backend-wasm@4.22.0/dist/tf-backend-wasm.min.js"></script>
   <script src="js/account.js"></script>
   <script src="js/app.js"></script>
 </body>

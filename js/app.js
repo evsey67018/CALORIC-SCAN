@@ -2,6 +2,8 @@
 const DIARY_KEY = "caloric-scan-diary-v1";
 const THEME_KEY = "caloric-theme";
 const PLATE_CM = 26;
+const MODEL_REV = "v3";
+const WASM_PATH = "https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-backend-wasm@4.22.0/dist/";
 
 const els = {
   themeBtn: document.getElementById("themeBtn"),
@@ -10,6 +12,9 @@ const els = {
   loadFill: document.getElementById("loadFill"),
   loadText: document.getElementById("loadText"),
   formError: document.getElementById("formError"),
+  analyzeBar: document.getElementById("analyzeBar"),
+  analyzeText: document.getElementById("analyzeText"),
+  retryBtn: document.getElementById("retryBtn"),
   result: document.getElementById("result"),
   photoCard: document.getElementById("photoCard"),
   canvas: document.getElementById("photoCanvas"),
@@ -46,6 +51,7 @@ const state = {
   segMeta: null,
   ready: false,
   meal: null,
+  backend: "webgl",
 };
 
 const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -99,6 +105,27 @@ function saveDiary(data) {
 function setError(text) {
   els.formError.hidden = !text;
   els.formError.textContent = text || "";
+  if (els.retryBtn) els.retryBtn.hidden = !text;
+}
+
+function showWorking(text) {
+  const message = text || "Анализирую…";
+  if (els.analyzeBar) els.analyzeBar.hidden = false;
+  if (els.analyzeText) els.analyzeText.textContent = message;
+  if (els.retryBtn) els.retryBtn.hidden = true;
+  setError("");
+  els.result.hidden = false;
+  els.photoCard.hidden = false;
+  els.scanline.hidden = false;
+  els.photoStatus.hidden = false;
+  els.photoStatus.textContent = message;
+  els.photoCard.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+function hideWorking() {
+  if (els.analyzeBar) els.analyzeBar.hidden = true;
+  els.scanline.hidden = true;
+  els.photoStatus.hidden = true;
 }
 
 function setLoad(percent, text) {
@@ -438,12 +465,34 @@ function letterbox(bitmap, size) {
   return { canvas, size, x, y, w, h };
 }
 
-function forward(model, image) {
-  let out = model.predict(image);
-  if (out && out.probs) out = out.probs;
-  if (out && out.logits) out = out.logits;
-  if (Array.isArray(out)) out = out[0];
+function unwrapOutput(out) {
+  if (!out) return out;
+  if (typeof out.argMax === "function" || typeof out.data === "function") return out;
+  if (out.probs) return out.probs;
+  if (out.logits) return out.logits;
+  if (out.output_0) return out.output_0;
+  if (Array.isArray(out)) return unwrapOutput(out[0]);
+  const values = Object.values(out);
+  if (values.length === 1) return unwrapOutput(values[0]);
   return out;
+}
+
+function predictImage(model, canvas, size) {
+  return tf.tidy(() => {
+    let img = tf.browser.fromPixels(canvas);
+    if (size) img = tf.image.resizeBilinear(img, [size, size]);
+    const input = img.toFloat().expandDims(0);
+    let out;
+    try {
+      out = model.predict(input);
+    } catch (err) {
+      const inputName = model.inputs?.[0]?.name || "image";
+      const short = String(inputName).split(":")[0];
+      out = model.execute({ [short]: input, [inputName]: input });
+      console.warn(err);
+    }
+    return unwrapOutput(out);
+  });
 }
 
 async function analyze(bitmap) {
@@ -452,16 +501,9 @@ async function analyze(bitmap) {
   els.canvas.width = segSize;
   els.canvas.height = segSize;
   els.canvas.getContext("2d").drawImage(work.canvas, 0, 0);
-  els.photoCard.hidden = false;
-  els.result.hidden = false;
-  els.scanline.hidden = false;
-  els.photoStatus.hidden = false;
-  els.photoStatus.textContent = "Ищем ингредиенты…";
+  showWorking("Анализирую…");
 
-  const logits = tf.tidy(() => {
-    const img = tf.browser.fromPixels(work.canvas).toFloat().expandDims(0);
-    return forward(state.seg, img);
-  });
+  const logits = predictImage(state.seg, work.canvas);
   const classTensor = logits.argMax(-1);
   const confTensor = tf.tidy(() => logits.softmax().max(-1));
   const classData = await classTensor.data();
@@ -476,11 +518,10 @@ async function analyze(bitmap) {
   const classes = { data: classData, w: gridW, h: gridH };
   const scale = plateScale(classData, gridW, gridH);
   if (!scale) {
-    els.scanline.hidden = true;
-    els.photoStatus.hidden = true;
+    hideWorking();
     setError("Не вижу еды на фото. Попробуй снимок тарелки сверху.");
     bitmap.close?.();
-    return;
+    return null;
   }
   const rows = [];
   const partsById = new Map();
@@ -528,11 +569,7 @@ async function analyze(bitmap) {
   let dish = null;
   if (state.dish) {
     const dishSize = state.dish.inputs?.[0]?.shape?.[1] || 160;
-    const scores = tf.tidy(() => {
-      const img = tf.browser.fromPixels(work.canvas);
-      const resized = tf.image.resizeBilinear(img, [dishSize, dishSize]).toFloat().expandDims(0);
-      return forward(state.dish, resized);
-    });
+    const scores = predictImage(state.dish, work.canvas, dishSize);
     const data = await scores.data();
     scores.dispose();
     let best = 0;
@@ -540,8 +577,7 @@ async function analyze(bitmap) {
     if (data[best] >= 0.4 && state.labels[best]) dish = { ...state.labels[best], conf: data[best] };
   }
 
-  els.scanline.hidden = true;
-  els.photoStatus.hidden = true;
+  hideWorking();
   bitmap.close?.();
   const meal = {
     rows,
@@ -562,53 +598,139 @@ async function analyze(bitmap) {
   return meal;
 }
 
+function looksLikeImage(file) {
+  const type = (file.type || "").toLowerCase();
+  const name = (file.name || "").toLowerCase();
+  if (!type) return true;
+  if (type.startsWith("image/")) return true;
+  return /\.(jpe?g|png|webp|gif|heic|heif|bmp|avif)$/.test(name);
+}
+
 async function fileToBitmap(file) {
-  if (!file || !file.type.startsWith("image/")) {
+  if (!file || !looksLikeImage(file)) {
     throw new Error("Нужно фото: JPG, PNG или WEBP.");
   }
-  return createImageBitmap(file, { imageOrientation: "from-image" });
+  const maxSide = 1600;
+  try {
+    const probe = await createImageBitmap(file, { imageOrientation: "from-image" });
+    const scale = Math.min(1, maxSide / Math.max(probe.width, probe.height));
+    if (scale >= 1) return probe;
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.max(1, Math.round(probe.width * scale));
+    canvas.height = Math.max(1, Math.round(probe.height * scale));
+    canvas.getContext("2d").drawImage(probe, 0, 0, canvas.width, canvas.height);
+    probe.close?.();
+    return createImageBitmap(canvas);
+  } catch {
+    throw new Error("Не удалось открыть это фото. Если оно в HEIC, сохрани его как JPG и попробуй снова.");
+  }
+}
+
+async function switchBackendAndReload() {
+  const order = ["wasm", "cpu"].filter((name) => name !== state.backend);
+  order.unshift(state.backend === "webgl" ? "wasm" : "cpu");
+  const next = [...new Set(order)];
+  for (const name of next) {
+    try {
+      await activateBackend(name);
+      state.backend = name;
+      await reloadModels();
+      return true;
+    } catch (err) {
+      console.warn(name, err);
+    }
+  }
+  return false;
 }
 
 async function handleFile(file) {
   setError("");
   if (!state.ready) {
-    setError("Нейросеть ещё загружается.");
+    setError("Нейросеть ещё загружается. Подожди пару секунд и нажми «Попробовать ещё раз».");
     return;
   }
-  if (!file || !file.type.startsWith("image/")) {
+  if (!file || !looksLikeImage(file)) {
     setError("Нужно фото: JPG, PNG или WEBP.");
     return;
   }
-  if (window.CaloricAccount) {
-    const allowed = await window.CaloricAccount.beforeScan();
-    if (!allowed) return;
-  }
+  showWorking("Анализирую…");
   let bitmap;
   try {
     bitmap = await fileToBitmap(file);
   } catch (err) {
+    hideWorking();
     setError(err.message || "Не удалось открыть фото.");
     return;
   }
+  if (window.CaloricAccount) {
+    let allowed = true;
+    try {
+      allowed = await window.CaloricAccount.beforeScan();
+    } catch (err) {
+      console.warn(err);
+      allowed = true;
+    }
+    if (!allowed) {
+      hideWorking();
+      bitmap.close?.();
+      return;
+    }
+  }
   try {
-    const meal = await analyze(bitmap);
-    if (meal && window.CaloricAccount) await window.CaloricAccount.afterScan(meal);
+    let meal = null;
+    try {
+      meal = await analyze(bitmap);
+    } catch (err) {
+      console.error(err);
+      bitmap = await fileToBitmap(file).catch(() => null);
+      const switched = bitmap && await switchBackendAndReload();
+      if (!switched || !bitmap) throw err;
+      showWorking("Анализирую ещё раз, уже без видеокарты…");
+      meal = await analyze(bitmap);
+    }
+    if (meal && window.CaloricAccount) {
+      try { await window.CaloricAccount.afterScan(meal); } catch (err) { console.warn(err); }
+    }
   } catch (err) {
     console.error(err);
-    els.scanline.hidden = true;
-    els.photoStatus.hidden = true;
-    setError("Не получилось разобрать фото. Попробуй ещё раз.");
+    hideWorking();
+    const detail = err && err.message ? " (" + String(err.message).slice(0, 140) + ")" : "";
+    setError("Не получилось разобрать фото" + detail + ". Нажми «Попробовать ещё раз».");
   }
 }
 
+async function activateBackend(name) {
+  if (name === "wasm" && tf.wasm?.setWasmPaths) tf.wasm.setWasmPaths(WASM_PATH);
+  await tf.setBackend(name);
+  await tf.ready();
+  const probe = tf.scalar(1);
+  await probe.data();
+  probe.dispose();
+}
+
 async function prepareBackend() {
-  try {
-    await tf.setBackend("webgl");
-    await tf.ready();
-  } catch {
-    await tf.setBackend("cpu");
-    await tf.ready();
+  const order = ["webgl", "wasm", "cpu"];
+  let lastError = null;
+  for (const name of order) {
+    try {
+      await activateBackend(name);
+      state.backend = name;
+      return name;
+    } catch (err) {
+      lastError = err;
+      console.warn(name, err);
+    }
   }
+  throw lastError || new Error("backend");
+}
+
+async function forgetStaleModels() {
+  const stale = [
+    "indexeddb://caloric-scan-v1",
+    "indexeddb://caloric-dish-v1",
+    "indexeddb://caloric-seg-v2",
+  ];
+  await Promise.all(stale.map((key) => tf.io.removeModel(key).catch(() => {})));
 }
 
 async function loadGraph(url, idbKey, onProgress) {
@@ -619,6 +741,13 @@ async function loadGraph(url, idbKey, onProgress) {
     try { await model.save(idbKey); } catch (err) { console.warn(err); }
     return model;
   }
+}
+
+async function reloadModels() {
+  const dishUrl = new URL("model/model.json", document.baseURI).href;
+  const segUrl = new URL("model/seg/model.json", document.baseURI).href;
+  state.dish = await loadGraph(dishUrl, "indexeddb://caloric-dish-" + MODEL_REV);
+  state.seg = await loadGraph(segUrl, "indexeddb://caloric-seg-" + MODEL_REV);
 }
 
 async function boot() {
@@ -633,14 +762,15 @@ async function boot() {
   state.ingredients = ingredients.items;
   state.segMeta = segMeta;
   await prepareBackend();
+  await forgetStaleModels();
   const dishUrl = new URL("model/model.json", document.baseURI).href;
   const segUrl = new URL("model/seg/model.json", document.baseURI).href;
   setLoad(5, "Загружаем модель блюда…");
-  state.dish = await loadGraph(dishUrl, "indexeddb://caloric-dish-v1", (frac) => {
+  state.dish = await loadGraph(dishUrl, "indexeddb://caloric-dish-" + MODEL_REV, (frac) => {
     setLoad(5 + frac * 40, "Загружаем модель блюда… " + Math.round(frac * 100) + "%");
   });
   setLoad(50, "Загружаем модель ингредиентов…");
-  state.seg = await loadGraph(segUrl, "indexeddb://caloric-seg-v2", (frac) => {
+  state.seg = await loadGraph(segUrl, "indexeddb://caloric-seg-" + MODEL_REV, (frac) => {
     setLoad(50 + frac * 50, "Загружаем модель ингредиентов… " + Math.round(frac * 100) + "%");
   });
   state.ready = true;
@@ -679,6 +809,12 @@ els.dropzone.addEventListener("drop", (event) => {
   if (file) handleFile(file);
 });
 els.addBtn.addEventListener("click", addToDiary);
+els.retryBtn?.addEventListener("click", () => els.file?.click());
+window.addEventListener("unhandledrejection", (event) => {
+  console.error(event.reason);
+  setError("Что-то пошло не так при разборе фото. Нажми «Попробовать ещё раз».");
+  hideWorking();
+});
 els.goal.addEventListener("change", () => {
   const data = loadDiary();
   const goal = Number(els.goal.value);

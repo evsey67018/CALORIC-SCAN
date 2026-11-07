@@ -1,7 +1,7 @@
 /* Аккаунт, лимит сканов и оплата. Распознавание еды живёт в app.js. */
 const FREE_LIMIT = 3;
 const QUOTA_KEY = "caloric-scan-quota-v1";
-const SUPABASE_UMD = "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.47.10/dist/umd/supabase.js";
+const SUPABASE_UMD = "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.119.0/dist/umd/supabase.js";
 
 const account = {
   client: null,
@@ -235,18 +235,22 @@ async function sendMagicLink(event) {
   const email = document.getElementById("authEmail")?.value?.trim();
   const config = cfg();
   if (!config.supabaseReady || !account.client) {
-    if (message) message.textContent = "Вход появится, когда будет подключён Supabase.";
+    if (message) message.textContent = "Вход сейчас недоступен. Сканер при этом работает.";
     return;
   }
   if (!email) return;
-  const { error } = await account.client.auth.signInWithOtp({
-    email,
-    options: { emailRedirectTo: window.location.origin + window.location.pathname },
-  });
-  if (message) {
-    message.textContent = error
-      ? "Не получилось отправить письмо. Проверь адрес."
-      : "Письмо ушло. Открой ссылку или введи код из письма.";
+  try {
+    const { error } = await account.client.auth.signInWithOtp({
+      email,
+      options: { shouldCreateUser: true },
+    });
+    if (error) throw error;
+    document.getElementById("authCodeBlock")?.removeAttribute("hidden");
+    if (message) message.textContent = "Код из 6 цифр отправлен на почту.";
+    document.getElementById("authCode")?.focus();
+  } catch (error) {
+    console.warn(error);
+    if (message) message.textContent = "Не получилось отправить код. Проверь адрес и попробуй ещё раз.";
   }
 }
 
@@ -254,16 +258,18 @@ async function verifyCode() {
   const message = document.getElementById("authMsg");
   const email = document.getElementById("authEmail")?.value?.trim();
   const token = document.getElementById("authCode")?.value?.trim();
-  if (!account.client || !email || !token) {
-    if (message) message.textContent = "Нужны почта и код из письма.";
+  if (!account.client || !email || !/^\d{6}$/.test(token || "")) {
+    if (message) message.textContent = "Введи почту и 6 цифр из письма.";
     return;
   }
-  const { error } = await account.client.auth.verifyOtp({ email, token, type: "email" });
-  if (error) {
-    if (message) message.textContent = "Код не подошёл. Запроси письмо ещё раз.";
-    return;
+  try {
+    const { error } = await account.client.auth.verifyOtp({ email, token, type: "email" });
+    if (error) throw error;
+    document.getElementById("authDialog")?.close();
+  } catch (error) {
+    console.warn(error);
+    if (message) message.textContent = "Код не подошёл. Запроси новый.";
   }
-  document.getElementById("authDialog")?.close();
 }
 
 async function signOut() {
@@ -508,13 +514,19 @@ window.CaloricAccount = {
       }
       return true;
     } catch (error) {
+      // Сбой Supabase не должен останавливать распознавание.
       console.warn(error);
-      const formError = document.getElementById("formError");
-      if (formError) {
-        formError.hidden = false;
-        formError.textContent = "Не удалось проверить лимит. Попробуй ещё раз.";
+      try {
+        const local = localConsume();
+        renderQuota(local);
+        if (!local.allowed) {
+          openPaywall();
+          return false;
+        }
+      } catch (localError) {
+        console.warn(localError);
       }
-      return false;
+      return true;
     }
   },
   afterScan,
