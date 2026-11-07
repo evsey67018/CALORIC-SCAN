@@ -48,6 +48,7 @@
     <div id="viewScan">
     <p class="lead">Добавь фото тарелки — найдём каждый ингредиент и прикинем калории. Всё считается в браузере, снимок никуда не уходит.</p>
     <p id="quotaText" class="quota">Осталось 3 из 3 сканов сегодня</p>
+    <button id="renewNote" class="renew" type="button" hidden>Подписка заканчивается — продлить</button>
 
     <label class="card upload" id="dropzone">
       <input id="file" type="file" accept="image/*" aria-label="Добавить фото">
@@ -158,19 +159,37 @@
         <h2>Лимит на сегодня</h2>
         <button id="payClose" class="icon-btn" type="button" aria-label="Закрыть">✕</button>
       </header>
-      <p>Бесплатно — 3 скана в день. Премиум снимает лимит.</p>
+      <p>Бесплатно — 3 скана в день. Оплата только по СБП, без карты и без автопродления: 199 ₽ — это 30 дней, 1299 ₽ — 365 дней.</p>
       <div class="plans">
         <article class="plan">
-          <h3>Месяц</h3>
+          <div class="sbp-brand" aria-hidden="true">
+            <svg viewBox="0 0 36 36" width="36" height="36">
+              <rect x="2" y="2" width="14" height="14" rx="2" fill="none" stroke="currentColor" stroke-width="2.4"/>
+              <rect x="20" y="2" width="14" height="14" rx="2" fill="none" stroke="currentColor" stroke-width="2.4"/>
+              <rect x="2" y="20" width="14" height="14" rx="2" fill="none" stroke="currentColor" stroke-width="2.4"/>
+              <path d="M22 22h10M22 27h10M22 32h6" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
+            </svg>
+            <span>СБП</span>
+          </div>
+          <h3>30 дней</h3>
           <p class="plan-price">199 ₽</p>
-          <button class="btn ghost" type="button" data-plan="month">Оформить</button>
+          <button class="btn sbp" type="button" data-plan="month">Оплатить по СБП</button>
         </article>
         <article class="plan plan-year">
           <p class="plan-badge">−46%</p>
-          <h3>Год</h3>
+          <div class="sbp-brand" aria-hidden="true">
+            <svg viewBox="0 0 36 36" width="36" height="36">
+              <rect x="2" y="2" width="14" height="14" rx="2" fill="none" stroke="currentColor" stroke-width="2.4"/>
+              <rect x="20" y="2" width="14" height="14" rx="2" fill="none" stroke="currentColor" stroke-width="2.4"/>
+              <rect x="2" y="20" width="14" height="14" rx="2" fill="none" stroke="currentColor" stroke-width="2.4"/>
+              <path d="M22 22h10M22 27h10M22 32h6" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
+            </svg>
+            <span>СБП</span>
+          </div>
+          <h3>365 дней</h3>
           <p class="plan-price">1299 ₽</p>
           <p class="muted">На 46% дешевле, чем 12 × 199 ₽</p>
-          <button class="btn tomato" type="button" data-plan="year">Оформить</button>
+          <button class="btn sbp" type="button" data-plan="year">Оплатить по СБП</button>
         </article>
       </div>
       <p id="payNote" class="note warn" hidden></p>

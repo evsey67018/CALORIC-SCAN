@@ -402,6 +402,38 @@ dialog::backdrop { background: rgba(16, 22, 16, 0.45); }
 .plan { position: relative; padding: 12px; border-radius: 18px; border: 1px solid var(--line); }
 .plan-year { border-color: rgba(255, 77, 58, 0.45); }
 .plan-price { margin: 4px 0 8px; font-family: Unbounded, Manrope, sans-serif; font-size: 1.4rem; }
+.btn.sbp {
+  background: #2f1d63;
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+}
+.sbp-brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #2f1d63;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+}
+[data-theme="dark"] .sbp-brand { color: #d6c7ff; }
+.renew {
+  display: block;
+  width: 100%;
+  margin: 0 0 12px;
+  border: 0;
+  border-radius: 16px;
+  padding: 12px 14px;
+  font: inherit;
+  font-weight: 800;
+  text-align: left;
+  cursor: pointer;
+  color: #172010;
+  background: linear-gradient(90deg, #efe6ff, #d6ff4a);
+}
 .plan-badge {
   position: absolute;
   top: 10px;

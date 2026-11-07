@@ -57,9 +57,39 @@ function localConsume() {
   return { allowed: true, used: status.used + 1, limit: FREE_LIMIT, premium: false, source: "local" };
 }
 
+function dayWord(n) {
+  const n10 = n % 10;
+  const n100 = n % 100;
+  if (n10 === 1 && n100 !== 11) return "день";
+  if (n10 >= 2 && n10 <= 4 && (n100 < 12 || n100 > 14)) return "дня";
+  return "дней";
+}
+
+function renderReminder(status) {
+  const note = document.getElementById("renewNote");
+  if (!note) return;
+  if (!status?.premium || !status.premium_until) {
+    note.hidden = true;
+    return;
+  }
+  const leftMs = new Date(status.premium_until).getTime() - Date.now();
+  const leftDays = leftMs / 86400000;
+  if (!(leftDays > 0) || leftDays > 3) {
+    note.hidden = true;
+    return;
+  }
+  note.hidden = false;
+  if (leftDays < 1) note.textContent = "Подписка заканчивается сегодня — продлить";
+  else {
+    const n = Math.ceil(leftDays);
+    note.textContent = `Подписка заканчивается через ${n} ${dayWord(n)} — продлить`;
+  }
+}
+
 function renderQuota(status) {
   account.quota = status;
   const node = document.getElementById("quotaText");
+  renderReminder(status);
   if (!node || !status) return;
   if (status.premium) {
     const until = status.premium_until
@@ -429,6 +459,7 @@ function wire() {
   document.getElementById("authVerify")?.addEventListener("click", verifyCode);
   document.getElementById("authClose")?.addEventListener("click", () => document.getElementById("authDialog")?.close());
   document.getElementById("payClose")?.addEventListener("click", () => document.getElementById("paywall")?.close());
+  document.getElementById("renewNote")?.addEventListener("click", openPaywall);
   document.querySelectorAll("[data-plan]").forEach((button) => {
     button.addEventListener("click", () => startPayment(button.dataset.plan));
   });

@@ -2,8 +2,8 @@
 // Секреты только из env (wrangler secret / .dev.vars), в репозитории их нет.
 
 const PLANS = {
-  month: { amount: "199.00", label: "Caloric Scan Premium на месяц" },
-  year: { amount: "1299.00", label: "Caloric Scan Premium на год" },
+  month: { amount: "199.00", days: 30, label: "Caloric Scan Premium, 30 дней, СБП" },
+  year: { amount: "1299.00", days: 365, label: "Caloric Scan Premium, 365 дней, СБП" },
 };
 
 function corsHeaders(request, env) {
@@ -91,11 +91,11 @@ async function supabaseRest(env, path, options = {}) {
   return data;
 }
 
-function addPeriod(fromDate, plan) {
-  const next = new Date(fromDate);
-  if (plan === "year") next.setUTCFullYear(next.getUTCFullYear() + 1);
-  else next.setUTCMonth(next.getUTCMonth() + 1);
-  return next;
+function extendUntil(currentIso, days) {
+  const now = Date.now();
+  const current = currentIso ? new Date(currentIso).getTime() : 0;
+  const start = Math.max(now, Number.isFinite(current) ? current : 0);
+  return new Date(start + days * 24 * 60 * 60 * 1000).toISOString();
 }
 
 function safeReturnUrl(raw, env) {
@@ -132,7 +132,7 @@ async function createPayment(request, env) {
       capture: true,
       confirmation: { type: "redirect", return_url: safeReturnUrl(body.return_url, env) },
       description: price.label,
-      save_payment_method: true,
+      payment_method_data: { type: "sbp" },
       metadata: { user_id: user.id, plan },
     }),
   });
@@ -158,13 +158,11 @@ async function createPayment(request, env) {
 
 async function grantPremium(env, row) {
   const profiles = await supabaseRest(env, `/profiles?id=eq.${row.user_id}&select=premium_until`);
-  const current = profiles?.[0]?.premium_until ? new Date(profiles[0].premium_until) : null;
-  const start = current && current.getTime() > Date.now() ? current : new Date();
-  const until = addPeriod(start, row.plan);
+  const until = extendUntil(profiles?.[0]?.premium_until, PLANS[row.plan].days);
   await supabaseRest(env, `/profiles?id=eq.${row.user_id}`, {
     method: "PATCH",
     headers: { Prefer: "return=minimal" },
-    body: JSON.stringify({ plan: "premium", premium_until: until.toISOString() }),
+    body: JSON.stringify({ plan: "premium", premium_until: until }),
   });
   await supabaseRest(env, `/payments?id=eq.${row.id}`, {
     method: "PATCH",
@@ -192,7 +190,8 @@ async function webhook(request, env) {
   const expected = PLANS[row.plan]?.amount;
   const paid = payment.amount?.value;
   const sameMoney = expected && Number(paid) === Number(expected) && payment.amount?.currency === "RUB";
-  if (payment.status === "succeeded" && payment.paid && sameMoney && payment.metadata?.user_id === row.user_id) {
+  const sbp = payment.payment_method?.type === "sbp";
+  if (payment.status === "succeeded" && payment.paid && sameMoney && sbp && payment.metadata?.user_id === row.user_id) {
     await grantPremium(env, row);
   } else if (payment.status === "canceled") {
     await supabaseRest(env, `/payments?id=eq.${row.id}`, {
