@@ -375,7 +375,7 @@ function renderMeal(meal, animate) {
     : "";
   if (meal.dish) {
     els.dishGuess.hidden = false;
-    const pct = fmt(meal.dish.conf * 100, 0);
+    const pct = fmt(Math.max(0, Math.min(100, meal.dish.conf * 100)), 0);
     const how = meal.dish.kind === "memory" ? "сходство " + pct + "%" : pct + "%";
     let text = "Похоже на: " + meal.dish.ru + " · " + how;
     if (meal.dish.kcal) text += " · ~" + fmt(meal.dish.kcal, 0) + " ккал/100 г";
@@ -527,6 +527,26 @@ function flipCanvasH(src) {
   return canvas;
 }
 
+function asProbs(data) {
+  const arr = Float32Array.from(data);
+  let sum = 0;
+  let neg = false;
+  for (let i = 0; i < arr.length; i += 1) {
+    sum += arr[i];
+    if (arr[i] < 0) neg = true;
+  }
+  if (!neg && sum > 0.98 && sum < 1.02) return arr;
+  let max = arr[0];
+  for (let i = 1; i < arr.length; i += 1) if (arr[i] > max) max = arr[i];
+  let z = 0;
+  for (let i = 0; i < arr.length; i += 1) {
+    arr[i] = Math.exp(arr[i] - max);
+    z += arr[i];
+  }
+  for (let i = 0; i < arr.length; i += 1) arr[i] /= z || 1;
+  return arr;
+}
+
 function l2vec(data) {
   const arr = Float32Array.from(data);
   let sum = 0;
@@ -543,27 +563,30 @@ function dequantBank(buf) {
   const dim = view.getUint16(6, true);
   const count = view.getUint32(8, true);
   let off = 12;
-  const raw = new Int8Array(buf, off, count * dim);
+  const raw = new Int8Array(buf.slice(off, off + count * dim));
   off += count * dim;
   const scales = new Float32Array(count);
   for (let i = 0; i < count; i += 1) scales[i] = view.getFloat16(off + i * 2, true);
   off += count * 2;
   const ids = new Uint16Array(count);
   for (let i = 0; i < count; i += 1) ids[i] = view.getUint16(off + i * 2, true);
-  const mat = new Float32Array(count * dim);
-  for (let i = 0; i < count; i += 1) {
-    const scale = scales[i] / 127;
-    let sum = 0;
-    const base = i * dim;
-    for (let d = 0; d < dim; d += 1) {
-      const v = raw[base + d] * scale;
-      mat[base + d] = v;
-      sum += v * v;
-    }
-    const norm = Math.sqrt(sum) || 1;
-    for (let d = 0; d < dim; d += 1) mat[base + d] /= norm;
+  return { dim, count, raw, scales, ids };
+}
+
+function packBank(parts) {
+  const dim = parts[0].dim;
+  const count = parts.reduce((sum, part) => sum + part.count, 0);
+  const raw = new Int8Array(count * dim);
+  const scales = new Float32Array(count);
+  const ids = new Uint16Array(count);
+  let cursor = 0;
+  for (const part of parts) {
+    raw.set(part.raw, cursor * dim);
+    scales.set(part.scales, cursor);
+    ids.set(part.ids, cursor);
+    cursor += part.count;
   }
-  return { dim, count, mat, ids };
+  return { dim, count, raw, scales, ids };
 }
 
 async function loadMemory() {
@@ -571,30 +594,35 @@ async function loadMemory() {
   const res = await fetch(indexUrl);
   if (!res.ok) return null;
   const index = await res.json();
-  const parts = [];
-  for (const chunk of index.chunks || []) {
-    const buf = await fetch(new URL(chunk.file, indexUrl)).then((r) => r.arrayBuffer());
-    parts.push(dequantBank(buf));
-  }
-  if (!parts.length) return null;
-  const dim = parts[0].dim;
-  const count = parts.reduce((sum, part) => sum + part.count, 0);
-  const mat = new Float32Array(count * dim);
-  const ids = new Uint16Array(count);
-  let cursor = 0;
-  for (const part of parts) {
-    mat.set(part.mat, cursor * dim);
-    ids.set(part.ids, cursor);
-    cursor += part.count;
-  }
-  return {
-    dim,
-    count,
-    mat,
-    ids,
+  const chunks = index.chunks || [];
+  if (!chunks.length) return null;
+  const first = dequantBank(await fetch(new URL(chunks[0].file, indexUrl)).then((r) => r.arrayBuffer()));
+  const memory = {
+    ...packBank([first]),
     classes: index.classes || [],
     fuse: index.fuse || { k: 8, temperature: 0.07, simMin: 0.45, margin: 0.05, clsGate: 0.5, blend: 0.25 },
+    loadedChunks: 1,
+    totalChunks: chunks.length,
   };
+  // Остальные куски не блокируют первый скан.
+  (async () => {
+    const rest = [];
+    for (const chunk of chunks.slice(1)) {
+      try {
+        rest.push(dequantBank(await fetch(new URL(chunk.file, indexUrl)).then((r) => r.arrayBuffer())));
+        const packed = packBank([first].concat(rest));
+        memory.dim = packed.dim;
+        memory.count = packed.count;
+        memory.raw = packed.raw;
+        memory.scales = packed.scales;
+        memory.ids = packed.ids;
+        memory.loadedChunks = 1 + rest.length;
+      } catch (err) {
+        console.warn(err);
+      }
+    }
+  })();
+  return memory;
 }
 
 function ensureMemory() {
@@ -616,11 +644,14 @@ function ensureMemory() {
 function knnSearch(vec, memory) {
   const k = memory.fuse.k || 8;
   const dim = memory.dim;
+  const raw = memory.raw;
+  const scales = memory.scales;
   const best = [];
   for (let i = 0; i < memory.count; i += 1) {
     let sim = 0;
     const base = i * dim;
-    for (let d = 0; d < dim; d += 1) sim += vec[d] * memory.mat[base + d];
+    const scale = scales[i] / 127;
+    for (let d = 0; d < dim; d += 1) sim += vec[d] * raw[base + d] * scale;
     if (best.length < k) {
       best.push({ sim, cls: memory.ids[i] });
       if (best.length === k) best.sort((a, b) => b.sim - a.sim);
@@ -716,7 +747,7 @@ async function dishPass(canvas) {
   const size = state.dish.inputs?.[0]?.shape?.[1] || 224;
   async function once(src) {
     const out = asList(runNet(state.dish, src, size));
-    const probs = Float32Array.from(await out[0].data());
+    const probs = asProbs(await out[0].data());
     const emb = out[1] ? l2vec(await out[1].data()) : null;
     disposeAll(out);
     return { probs, emb };
@@ -743,10 +774,11 @@ function buildRows(classData, confData, gridW, gridH, scale, dishId, strict) {
   let sweet = 0;
   let food = 0;
   const minPart = Math.max(6, Math.round(gridW * gridH * 0.002));
+  const confCut = strict ? 0.4 : 0.2;
   for (let i = 0; i < classData.length; i += 1) {
     const id = classData[i];
     if (!id) continue;
-    if (confData[i] < 0.4) {
+    if (confData[i] < confCut) {
       classData[i] = 0;
       continue;
     }
@@ -833,7 +865,7 @@ async function analyze(bitmap) {
     if (!dish) {
       let best = 0;
       for (let i = 1; i < scored.probs.length; i += 1) if (scored.probs[i] > scored.probs[best]) best = i;
-      if (scored.probs[best] >= 0.28 && state.labels[best]) {
+      if (state.labels[best]) {
         dish = { kind: "classifier", ...state.labels[best], conf: scored.probs[best] };
       }
     }
@@ -856,7 +888,7 @@ async function analyze(bitmap) {
     fat: built.rows.reduce((sum, row) => sum + row.fat, 0),
     carbs: built.rows.reduce((sum, row) => sum + row.carbs, 0),
   };
-  if (!built.rows.length) {
+  if (!built.rows.length && !dish) {
     setError("Ингредиенты не разобрались. Попробуй другое фото.");
     return null;
   }
@@ -1023,10 +1055,11 @@ async function reloadModels() {
 async function boot() {
   applyTheme(localStorage.getItem(THEME_KEY) || "light");
   renderDiary();
-  const [labels, ingredients, segMeta] = await Promise.all([
+  const [labels, ingredients, segMeta, dishMeta] = await Promise.all([
     fetch(new URL("data/labels.json", document.baseURI)).then((r) => r.json()),
     fetch(new URL("data/ingredients.json", document.baseURI)).then((r) => r.json()),
     fetch(new URL("model/seg/metadata.json", document.baseURI)).then((r) => (r.ok ? r.json() : null)),
+    fetch(new URL("model/metadata.json", document.baseURI)).then((r) => (r.ok ? r.json() : null)),
   ]);
   state.labels = labels;
   state.ingredients = ingredients.items;
@@ -1047,7 +1080,7 @@ async function boot() {
   setLoad(100, "Нейросеть готова — добавь фото");
   ensureMemory().then((mem) => {
     const miou = fmt((segMeta?.miou_food || 0) * 100, 1);
-    const top1 = fmt((segMeta?.food101_test_top1 || 0) * 100, 1);
+    const top1 = fmt(((dishMeta?.test_top1 || segMeta?.food101_test_top1 || 0)) * 100, 1);
     const tail = mem ? " Память: " + mem.classes.length + " блюд, " + mem.count + " прототипов." : "";
     els.modelNote.textContent = "Ингредиенты: FoodSeg103, mIoU " + miou
       + "%. Название: классификатор top-1 " + top1 + "%." + tail;
