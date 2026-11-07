@@ -1,11 +1,17 @@
 {
-  "version": "v1",
+  "version": "v4",
   "backbone": "MobileNetV2",
-  "pretrained": "imagenet",
-  "img_size": 160,
+  "pretrained": "food101-v1-checkpoint",
+  "img_size": 224,
   "quantize": "float16",
-  "test_top1": 0.6106,
-  "test_top5": 0.8546,
+  "head": "linear",
+  "test_top1": 0.6407,
+  "test_top5": 0.8705,
+  "test_top1_knn": 0.3507,
+  "test_top1_fuse": 0.6222,
   "test_images": 25250,
-  "train_images": 73730
+  "pca_dim": 64,
+  "memory_holdout_top1": 0.6288,
+  "memory_holdout_images": 458,
+  "catalog_dishes": 10000
 }
