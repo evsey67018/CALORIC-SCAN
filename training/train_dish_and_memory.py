@@ -477,6 +477,22 @@ def main():
             proto_ids.append(id_to_index[dish_id])
         kept_classes += 1
         kept_images += len(cleaned)
+    # Имена без своих фото тоже лежат в индексе (питание на 100 г), но kNN их не вернёт.
+    for row in catalog:
+        if row["id"] in id_to_index or len(shipped) >= 10000:
+            continue
+        id_to_index[row["id"]] = len(shipped)
+        shipped.append({
+            "id": row["id"],
+            "ru": row.get("ru") or row.get("en") or row["id"],
+            "en": row.get("en") or row["id"],
+            "kcal": row.get("kcal", 0),
+            "protein": row.get("protein", 0),
+            "fat": row.get("fat", 0),
+            "carbs": row.get("carbs", 0),
+            "nutrition": row.get("nutrition", "estimated"),
+            "classifierIndex": row.get("classifierIndex"),
+        })
     log(f"хвост классов {kept_classes}  фото после чистки {kept_images}  близких к тесту {dropped_near}")
 
     bank = l2(np.stack(proto_vecs).astype(np.float32))

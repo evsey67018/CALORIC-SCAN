@@ -487,6 +487,55 @@ def page_details(titles: list[str]) -> list[dict]:
     return rows
 
 
+def off_records() -> list[dict]:
+    path = "/tmp/off_categories.json"
+    if not os.path.exists(path):
+        raw = get("https://static.openfoodfacts.org/data/taxonomies/categories.json", 60)
+        with open(path, "wb") as fh:
+            fh.write(raw)
+    with open(path, encoding="utf-8") as fh:
+        data = json.load(fh)
+    children = {}
+    for key, row in data.items():
+        for parent in row.get("parents") or []:
+            children.setdefault(parent, []).append(key)
+    roots = [
+        "en:meals", "en:desserts", "en:pastries", "en:biscuits", "en:pies",
+        "en:sandwiches", "en:soups", "en:salads", "en:pizzas", "en:pastas",
+        "en:stews", "en:breakfasts", "en:snacks", "en:breads", "en:dumplings",
+        "en:prepared-meals", "en:main-courses", "en:appetizers", "en:side-dishes",
+    ]
+    dish_ids = set()
+    stack = list(roots)
+    while stack:
+        key = stack.pop()
+        if key in dish_ids:
+            continue
+        dish_ids.add(key)
+        stack.extend(children.get(key, []))
+    drink = re.compile(r"wine|beer|cider|whisky|whiskey|vodka|rum|spirit|liqueur|champagne", re.I)
+    records = []
+    for key, row in data.items():
+        if drink.search(key):
+            continue
+        name = row.get("name") or {}
+        en = name.get("en") or ""
+        ru = name.get("ru") or ""
+        if en and drink.search(en):
+            continue
+        if not en and not ru:
+            continue
+        records.append({
+            "key": key,
+            "en": en or ru,
+            "ru": ru,
+            "dishy": key in dish_ids,
+        })
+    records.sort(key=lambda r: (not r["dishy"], not r["ru"], r["en"].lower()))
+    log(f"Open Food Facts: {len(records)} имён, из них блюдных веток {sum(1 for r in records if r['dishy'])}")
+    return records
+
+
 def build_catalog() -> list[dict]:
     labels = load_labels()
     usda = load_food101_nutrition()
@@ -550,34 +599,27 @@ def build_catalog() -> list[dict]:
             **nut,
         })
 
-    titles = collect_titles(9000)
-    for row in page_details(titles):
+    for row in off_records():
+        if len(by_id) >= 10000:
+            break
         dish_id = slug(row["en"])
-        if not dish_id or not row["en"]:
+        if not dish_id or dish_id in by_id:
             continue
         nut = nutrition_guess(row["en"] + " " + row["ru"])
-        ru = row["ru"] or glossary_ru(row["en"]) or row["en"]
-        item = {
+        gloss = glossary_ru(row["en"])
+        ru = row["ru"] or gloss or row["en"]
+        add({
             "id": dish_id,
             "ru": ru,
             "en": row["en"],
-            "priority": 30,
+            "priority": 35 if row["dishy"] else 20,
             "classifierIndex": None,
-            "query": row["en"] + " dish",
-            "thumb": row["thumb"],
-            "ru_source": "wikipedia" if row["ru"] else ("glossary" if glossary_ru(row["en"]) else "en"),
+            "query": row["en"] + " food",
+            "ru_source": "openfoodfacts" if row["ru"] else ("glossary" if gloss else "en"),
             **nut,
-        }
-        # Не затираем кураторские и Food-101.
-        if dish_id not in by_id:
-            add(item)
-        elif by_id[dish_id].get("priority", 0) <= 30 and row["thumb"]:
-            by_id[dish_id]["thumb"] = row["thumb"]
-            if row["ru"]:
-                by_id[dish_id]["ru"] = row["ru"]
-                by_id[dish_id]["ru_source"] = "wikipedia"
+        })
 
-    catalog = sorted(by_id.values(), key=lambda r: (-r.get("priority", 0), r["id"]))
+    catalog = sorted(by_id.values(), key=lambda r: (-r.get("priority", 0), r["id"]))[:10000]
     # Ровно не раздуваем сверх разумного: имена оставляем, картинки ограничит загрузчик.
     log(f"каталог блюд: {len(catalog)}")
     os.makedirs(OUT, exist_ok=True)
@@ -739,13 +781,56 @@ def write_status(catalog: list[dict], reason: str) -> None:
     log("STATUS " + json.dumps(status, ensure_ascii=False))
 
 
+def download_tail(catalog: list[dict], exclude: set[str]) -> str:
+    """Ещё пачка блюд, но не тысячи запросов: упираемся в лимит времени и фото."""
+    t0 = time.time()
+    reason = "tail-done"
+    picked = [
+        row for row in catalog
+        if row.get("priority", 0) < 100 and row.get("classifierIndex") is None
+    ]
+    log(f"добор картинок, кандидатов {len(picked)}")
+    queries = 0
+    for row in picked:
+        if (time.time() - t0) / 60 > 16:
+            reason = "tail-time-cap"
+            break
+        if count_images() >= MAX_IMAGES:
+            reason = "image-cap"
+            break
+        if queries >= 450:
+            reason = "query-cap"
+            break
+        folder = os.path.join(OUT, row["id"])
+        os.makedirs(folder, exist_ok=True)
+        if any(name.endswith(".jpg") for name in os.listdir(folder)):
+            continue
+        queries += 1
+        try:
+            urls = ddg_urls(row["query"], 8)
+        except Exception as exc:  # noqa: BLE001
+            log(f"  поиск {row['id']}: {exc}")
+            time.sleep(2)
+            continue
+        ok = 0
+        with ThreadPoolExecutor(max_workers=8) as pool:
+            futs = [pool.submit(download_one, url, folder, exclude) for url in urls[:8]]
+            for fut in as_completed(futs):
+                ok += int(bool(fut.result()))
+        if queries % 25 == 0:
+            log(f"  добор {queries}  фото всего {count_images()}  последнее {row['id']} +{ok}")
+        time.sleep(0.35)
+    log(f"добор запросов {queries} причина {reason}")
+    return reason
+
+
 def main():
     os.makedirs(OUT, exist_ok=True)
     exclude = held_out_md5()
     catalog = build_catalog()
     reason = download_common(catalog, exclude)
     if reason == "common-done" and count_images() < MAX_IMAGES:
-        reason = download_thumbs(catalog, exclude)
+        reason = download_tail(catalog, exclude)
     write_status(catalog, reason)
 
 
