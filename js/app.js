@@ -2,7 +2,7 @@
 const DIARY_KEY = "caloric-scan-diary-v1";
 const THEME_KEY = "caloric-theme";
 const PLATE_CM = 26;
-const MODEL_REV = "v3";
+const MODEL_REV = "v4";
 const WASM_PATH = "https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-backend-wasm@4.22.0/dist/";
 
 const els = {
@@ -52,6 +52,9 @@ const state = {
   ready: false,
   meal: null,
   backend: "webgl",
+  memory: null,
+  memoryPromise: null,
+  memoryFailed: false,
 };
 
 const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -372,7 +375,11 @@ function renderMeal(meal, animate) {
     : "";
   if (meal.dish) {
     els.dishGuess.hidden = false;
-    els.dishGuess.textContent = "Похоже на: " + meal.dish.ru + " · " + fmt(meal.dish.conf * 100, 0) + "%";
+    const pct = fmt(meal.dish.conf * 100, 0);
+    const how = meal.dish.kind === "memory" ? "сходство " + pct + "%" : pct + "%";
+    let text = "Похоже на: " + meal.dish.ru + " · " + how;
+    if (meal.dish.kcal) text += " · ~" + fmt(meal.dish.kcal, 0) + " ккал/100 г";
+    els.dishGuess.textContent = text;
   } else {
     els.dishGuess.hidden = true;
   }
@@ -477,71 +484,295 @@ function unwrapOutput(out) {
   return out;
 }
 
-function predictImage(model, canvas, size) {
-  return tf.tidy(() => {
-    let img = tf.browser.fromPixels(canvas);
-    if (size) img = tf.image.resizeBilinear(img, [size, size]);
-    const input = img.toFloat().expandDims(0);
-    let out;
-    try {
-      out = model.predict(input);
-    } catch (err) {
-      const inputName = model.inputs?.[0]?.name || "image";
-      const short = String(inputName).split(":")[0];
-      out = model.execute({ [short]: input, [inputName]: input });
-      console.warn(err);
-    }
-    return unwrapOutput(out);
-  });
+function runNet(model, canvas, size) {
+  let img = tf.browser.fromPixels(canvas);
+  if (size) img = tf.image.resizeBilinear(img, [size, size]);
+  const input = img.toFloat().expandDims(0);
+  img.dispose();
+  const inputName = model.inputs?.[0]?.name || "image";
+  const short = String(inputName).split(":")[0];
+  let out;
+  try {
+    out = model.execute({ [short]: input, [inputName]: input });
+  } catch (err) {
+    out = model.predict(input);
+  }
+  input.dispose();
+  return out;
 }
 
-async function analyze(bitmap) {
-  const segSize = state.segMeta?.img_size || 224;
-  const work = letterbox(bitmap, segSize);
-  els.canvas.width = segSize;
-  els.canvas.height = segSize;
-  els.canvas.getContext("2d").drawImage(work.canvas, 0, 0);
-  showWorking("Анализирую…");
-
-  const logits = predictImage(state.seg, work.canvas);
-  const classTensor = logits.argMax(-1);
-  const confTensor = tf.tidy(() => logits.softmax().max(-1));
-  const classData = await classTensor.data();
-  const confData = await confTensor.data();
-  const shape = classTensor.shape;
-  const gridH = shape[shape.length - 2];
-  const gridW = shape[shape.length - 1];
-  logits.dispose();
-  classTensor.dispose();
-  confTensor.dispose();
-
-  const classes = { data: classData, w: gridW, h: gridH };
-  const scale = plateScale(classData, gridW, gridH);
-  if (!scale) {
-    hideWorking();
-    setError("Не вижу еды на фото. Попробуй снимок тарелки сверху.");
-    bitmap.close?.();
-    return null;
+function asList(out) {
+  if (!out) return [];
+  if (Array.isArray(out)) return out;
+  if (out.probs || out.embedding) return [out.probs, out.embedding].filter(Boolean);
+  if (typeof out.shape === "undefined") {
+    const vals = Object.values(out).filter((v) => v && v.shape);
+    if (vals.length) return vals;
   }
-  const rows = [];
-  const partsById = new Map();
-  let confSum = 0;
-  let confN = 0;
-  for (let i = 0; i < classData.length; i += 1) {
-    if (classData[i]) {
-      confSum += confData[i];
-      confN += 1;
+  return [unwrapOutput(out)];
+}
+
+function disposeAll(list) {
+  for (const t of list) if (t && t.dispose) t.dispose();
+}
+
+function flipCanvasH(src) {
+  const canvas = document.createElement("canvas");
+  canvas.width = src.width;
+  canvas.height = src.height;
+  const ctx = canvas.getContext("2d");
+  ctx.translate(canvas.width, 0);
+  ctx.scale(-1, 1);
+  ctx.drawImage(src, 0, 0);
+  return canvas;
+}
+
+function l2vec(data) {
+  const arr = Float32Array.from(data);
+  let sum = 0;
+  for (let i = 0; i < arr.length; i += 1) sum += arr[i] * arr[i];
+  const norm = Math.sqrt(sum) || 1;
+  for (let i = 0; i < arr.length; i += 1) arr[i] /= norm;
+  return arr;
+}
+
+function dequantBank(buf) {
+  const view = new DataView(buf);
+  const magic = String.fromCharCode(view.getUint8(0), view.getUint8(1), view.getUint8(2), view.getUint8(3));
+  if (magic !== "CSM1") throw new Error("memory");
+  const dim = view.getUint16(6, true);
+  const count = view.getUint32(8, true);
+  let off = 12;
+  const raw = new Int8Array(buf, off, count * dim);
+  off += count * dim;
+  const scales = new Float32Array(count);
+  for (let i = 0; i < count; i += 1) scales[i] = view.getFloat16(off + i * 2, true);
+  off += count * 2;
+  const ids = new Uint16Array(count);
+  for (let i = 0; i < count; i += 1) ids[i] = view.getUint16(off + i * 2, true);
+  const mat = new Float32Array(count * dim);
+  for (let i = 0; i < count; i += 1) {
+    const scale = scales[i] / 127;
+    let sum = 0;
+    const base = i * dim;
+    for (let d = 0; d < dim; d += 1) {
+      const v = raw[base + d] * scale;
+      mat[base + d] = v;
+      sum += v * v;
+    }
+    const norm = Math.sqrt(sum) || 1;
+    for (let d = 0; d < dim; d += 1) mat[base + d] /= norm;
+  }
+  return { dim, count, mat, ids };
+}
+
+async function loadMemory() {
+  const indexUrl = new URL("model/memory/index.json", document.baseURI);
+  const res = await fetch(indexUrl);
+  if (!res.ok) return null;
+  const index = await res.json();
+  const parts = [];
+  for (const chunk of index.chunks || []) {
+    const buf = await fetch(new URL(chunk.file, indexUrl)).then((r) => r.arrayBuffer());
+    parts.push(dequantBank(buf));
+  }
+  if (!parts.length) return null;
+  const dim = parts[0].dim;
+  const count = parts.reduce((sum, part) => sum + part.count, 0);
+  const mat = new Float32Array(count * dim);
+  const ids = new Uint16Array(count);
+  let cursor = 0;
+  for (const part of parts) {
+    mat.set(part.mat, cursor * dim);
+    ids.set(part.ids, cursor);
+    cursor += part.count;
+  }
+  return {
+    dim,
+    count,
+    mat,
+    ids,
+    classes: index.classes || [],
+    fuse: index.fuse || { k: 8, temperature: 0.07, simMin: 0.45, margin: 0.05, clsGate: 0.5, blend: 0.25 },
+  };
+}
+
+function ensureMemory() {
+  if (state.memory || state.memoryFailed) return Promise.resolve(state.memory);
+  if (!state.memoryPromise) {
+    state.memoryPromise = loadMemory().then((mem) => {
+      state.memory = mem;
+      if (!mem) state.memoryFailed = true;
+      return mem;
+    }).catch((err) => {
+      console.warn(err);
+      state.memoryFailed = true;
+      return null;
+    });
+  }
+  return state.memoryPromise;
+}
+
+function knnSearch(vec, memory) {
+  const k = memory.fuse.k || 8;
+  const dim = memory.dim;
+  const best = [];
+  for (let i = 0; i < memory.count; i += 1) {
+    let sim = 0;
+    const base = i * dim;
+    for (let d = 0; d < dim; d += 1) sim += vec[d] * memory.mat[base + d];
+    if (best.length < k) {
+      best.push({ sim, cls: memory.ids[i] });
+      if (best.length === k) best.sort((a, b) => b.sim - a.sim);
+    } else if (sim > best[k - 1].sim) {
+      best[k - 1] = { sim, cls: memory.ids[i] };
+      best.sort((a, b) => b.sim - a.sim);
     }
   }
-  const meanConf = confN ? confSum / confN : 0;
+  best.sort((a, b) => b.sim - a.sim);
+  return best;
+}
+
+function fuseDish(probs, neighbors, memory) {
+  const params = memory.fuse;
+  const votes = new Map();
+  const sims = new Map();
+  for (const n of neighbors) {
+    const w = Math.exp(n.sim / params.temperature);
+    votes.set(n.cls, (votes.get(n.cls) || 0) + w);
+    if (n.sim > (sims.get(n.cls) ?? -1)) sims.set(n.cls, n.sim);
+  }
+  let z = 0;
+  for (const w of votes.values()) z += w;
+  const items = [...votes.entries()].sort((a, b) => b[1] - a[1]);
+  const topCi = items[0][0];
+  const second = items[1] ? items[1][1] / z : 0;
+  const margin = items[0][1] / z - second;
+  const topSim = sims.get(topCi);
+  let clsBest = 0;
+  for (let i = 1; i < probs.length; i += 1) if (probs[i] > probs[clsBest]) clsBest = i;
+  const mapped = memory.classes[topCi] ? memory.classes[topCi].classifierIndex : null;
+  const longTail = mapped === null || mapped === undefined;
+  const take = topSim >= params.simMin && margin >= params.margin && probs[clsBest] < params.clsGate && (longTail || mapped !== clsBest);
+  if (take && memory.classes[topCi]) {
+    const mem = memory.classes[topCi];
+    return { kind: "memory", ru: mem.ru, en: mem.en, id: mem.id, conf: topSim, kcal: mem.kcal };
+  }
+  const blend = params.blend || 0;
+  const mixed = Float64Array.from(probs, (p) => p * (1 - blend));
+  for (const [ci, w] of votes) {
+    const j = memory.classes[ci] && memory.classes[ci].classifierIndex;
+    if (j !== null && j !== undefined) mixed[j] += blend * (w / z);
+  }
+  let sum = 0;
+  for (const v of mixed) sum += v;
+  if (sum > 0) for (let i = 0; i < mixed.length; i += 1) mixed[i] /= sum;
+  let j = 0;
+  for (let i = 1; i < mixed.length; i += 1) if (mixed[i] > mixed[j]) j = i;
+  const label = state.labels[j];
+  const nut = memory.classes.find((row) => row.classifierIndex === j);
+  if (!label) return null;
+  return { kind: "blend", ru: label.ru, en: label.en, id: label.id, conf: mixed[j], kcal: nut && nut.kcal };
+}
+
+const SWEET_IDS = new Set([1, 4, 6, 7, 8, 10, 42]);
+const SAVORY_IDS = new Set([46, 47, 48, 49, 50, 51, 54, 55, 56, 64, 65, 66, 80, 82, 83]);
+const STRICT_ING = {
+  61: { dishes: ["pizza"], minConf: 0.72, minFrac: 0.06 },
+  60: { dishes: ["hamburger"], minConf: 0.7, minFrac: 0.06 },
+  9: { dishes: ["pizza", "cheese", "lasagna", "macaroni", "caprese", "quesadilla", "nachos"], minConf: 0.6, minFrac: 0.04 },
+  42: { dishes: ["waffle", "pancake", "yogurt", "cake", "fruit"], minConf: 0.62, minFrac: 0.045 },
+  10: { dishes: ["cake", "cup_cakes", "cheesecake", "tiramisu", "shortcake", "brownie"], minConf: 0.6, minFrac: 0.05 },
+};
+
+function ingredientOk(id, frac, meanConf, dishId, savoryHeavy) {
+  if (!id || id === 103) return false;
+  if (meanConf < 0.42 || frac < 0.012) return false;
+  if (savoryHeavy && SWEET_IDS.has(id) && meanConf < 0.7) return false;
+  const rule = STRICT_ING[id];
+  if (!rule) return true;
+  const dish = dishId || "";
+  if (rule.dishes.some((name) => dish.includes(name))) return true;
+  return meanConf >= rule.minConf && frac >= rule.minFrac;
+}
+
+async function segPass(canvas) {
+  const out = asList(runNet(state.seg, canvas));
+  const logits = out[0];
+  const flipped = flipCanvasH(canvas);
+  const outB = asList(runNet(state.seg, flipped));
+  const back = tf.reverse(outB[0], [2]);
+  const avg = logits.add(back).div(2);
+  const classTensor = avg.argMax(-1);
+  const confTensor = avg.softmax().max(-1);
+  const classData = new Uint16Array(await classTensor.data());
+  const confData = Float32Array.from(await confTensor.data());
+  const shape = classTensor.shape;
+  disposeAll(out.concat(outB, [back, avg, classTensor, confTensor]));
+  return { classData, confData, w: shape[shape.length - 1], h: shape[shape.length - 2] };
+}
+
+async function dishPass(canvas) {
+  const size = state.dish.inputs?.[0]?.shape?.[1] || 224;
+  async function once(src) {
+    const out = asList(runNet(state.dish, src, size));
+    const probs = Float32Array.from(await out[0].data());
+    const emb = out[1] ? l2vec(await out[1].data()) : null;
+    disposeAll(out);
+    return { probs, emb };
+  }
+  const a = await once(canvas);
+  const b = await once(flipCanvasH(canvas));
+  const probs = new Float32Array(a.probs.length);
+  for (let i = 0; i < probs.length; i += 1) probs[i] = (a.probs[i] + b.probs[i]) / 2;
+  let emb = a.emb;
+  if (a.emb && b.emb && a.emb.length === b.emb.length) {
+    const mixed = new Float32Array(a.emb.length);
+    for (let i = 0; i < mixed.length; i += 1) mixed[i] = a.emb[i] + b.emb[i];
+    emb = l2vec(mixed);
+  }
+  return { probs, emb };
+}
+
+function buildRows(classData, confData, gridW, gridH, scale, dishId, strict) {
+  const rows = [];
+  const partsById = new Map();
+  const area = new Map();
+  const confSum = new Map();
+  let savory = 0;
+  let sweet = 0;
+  let food = 0;
+  const minPart = Math.max(6, Math.round(gridW * gridH * 0.002));
+  for (let i = 0; i < classData.length; i += 1) {
+    const id = classData[i];
+    if (!id) continue;
+    if (confData[i] < 0.4) {
+      classData[i] = 0;
+      continue;
+    }
+    food += 1;
+    area.set(id, (area.get(id) || 0) + 1);
+    confSum.set(id, (confSum.get(id) || 0) + confData[i]);
+    if (SAVORY_IDS.has(id)) savory += 1;
+    if (SWEET_IDS.has(id)) sweet += 1;
+  }
+  const savoryHeavy = savory > sweet * 2 && savory > food * 0.25;
+  const grid = gridW * gridH;
   for (let id = 1; id < state.ingredients.length; id += 1) {
+    const pixels0 = area.get(id) || 0;
+    if (!pixels0) continue;
+    const mean = confSum.get(id) / pixels0;
+    const frac = pixels0 / grid;
+    if (strict && !ingredientOk(id, frac, mean, dishId, savoryHeavy)) {
+      for (let i = 0; i < classData.length; i += 1) if (classData[i] === id) classData[i] = 0;
+      continue;
+    }
     const info = state.ingredients[id];
     if (!info) continue;
-    const parts = componentsOf(classData, gridW, gridH, id).filter((part) => part.count >= 6);
+    const parts = componentsOf(classData, gridW, gridH, id).filter((part) => part.count >= minPart);
     const pixels = parts.reduce((sum, part) => sum + part.count, 0);
     const gramsRaw = pixels * scale.cmPerPx * scale.cmPerPx * info.g_per_cm2;
-    // Мелкие пятна маски не показываем: это шум сетки 56×56, не порция.
-    if (gramsRaw < 8 || pixels < 8) continue;
+    if (gramsRaw < 8 || pixels < minPart) continue;
     partsById.set(id, parts);
     const grams = Math.min(600, gramsRaw);
     const k = grams / 100;
@@ -561,34 +792,71 @@ async function analyze(bitmap) {
       fiber: (info.fiber || 0) * k,
       sugar: (info.sugar || 0) * k,
       countLabel,
+      frac,
     });
   }
   rows.sort((a, b) => b.kcal - a.kcal);
-  paint(work, classes, partsById);
+  return {
+    rows,
+    partsById,
+    classData,
+    meanConf: food ? [...confSum.values()].reduce((s, v) => s + v, 0) / food : 0,
+  };
+}
+
+async function analyze(bitmap) {
+  const segSize = state.segMeta?.img_size || 224;
+  const work = letterbox(bitmap, segSize);
+  els.canvas.width = segSize;
+  els.canvas.height = segSize;
+  els.canvas.getContext("2d").drawImage(work.canvas, 0, 0);
+  showWorking("Анализирую…");
+  const memory = await ensureMemory();
+
+  const seg = await segPass(work.canvas);
+  const classes = { data: seg.classData, w: seg.w, h: seg.h };
+  const scale = plateScale(seg.classData, seg.w, seg.h);
+  if (!scale) {
+    hideWorking();
+    setError("Не вижу еды на фото. Попробуй снимок тарелки сверху.");
+    bitmap.close?.();
+    return null;
+  }
 
   let dish = null;
   if (state.dish) {
-    const dishSize = state.dish.inputs?.[0]?.shape?.[1] || 160;
-    const scores = predictImage(state.dish, work.canvas, dishSize);
-    const data = await scores.data();
-    scores.dispose();
-    let best = 0;
-    for (let i = 1; i < data.length; i += 1) if (data[i] > data[best]) best = i;
-    if (data[best] >= 0.4 && state.labels[best]) dish = { ...state.labels[best], conf: data[best] };
+    const scored = await dishPass(work.canvas);
+    if (memory && scored.emb && scored.emb.length === memory.dim) {
+      const neighbors = knnSearch(scored.emb, memory);
+      dish = fuseDish(scored.probs, neighbors, memory);
+    }
+    if (!dish) {
+      let best = 0;
+      for (let i = 1; i < scored.probs.length; i += 1) if (scored.probs[i] > scored.probs[best]) best = i;
+      if (scored.probs[best] >= 0.28 && state.labels[best]) {
+        dish = { kind: "classifier", ...state.labels[best], conf: scored.probs[best] };
+      }
+    }
   }
 
+  let built = buildRows(seg.classData.slice(), seg.confData, seg.w, seg.h, scale, dish && dish.id, true);
+  if (!built.rows.length) {
+    built = buildRows(seg.classData.slice(), seg.confData, seg.w, seg.h, scale, dish && dish.id, false);
+  }
+  classes.data = built.classData;
+  paint(work, classes, built.partsById);
   hideWorking();
   bitmap.close?.();
   const meal = {
-    rows,
+    rows: built.rows,
     dish,
-    low: meanConf < 0.4,
-    kcal: rows.reduce((sum, row) => sum + row.kcal, 0),
-    protein: rows.reduce((sum, row) => sum + row.protein, 0),
-    fat: rows.reduce((sum, row) => sum + row.fat, 0),
-    carbs: rows.reduce((sum, row) => sum + row.carbs, 0),
+    low: built.meanConf < 0.45,
+    kcal: built.rows.reduce((sum, row) => sum + row.kcal, 0),
+    protein: built.rows.reduce((sum, row) => sum + row.protein, 0),
+    fat: built.rows.reduce((sum, row) => sum + row.fat, 0),
+    carbs: built.rows.reduce((sum, row) => sum + row.carbs, 0),
   };
-  if (!rows.length) {
+  if (!built.rows.length) {
     setError("Ингредиенты не разобрались. Попробуй другое фото.");
     return null;
   }
@@ -728,7 +996,9 @@ async function forgetStaleModels() {
   const stale = [
     "indexeddb://caloric-scan-v1",
     "indexeddb://caloric-dish-v1",
+    "indexeddb://caloric-dish-v3",
     "indexeddb://caloric-seg-v2",
+    "indexeddb://caloric-seg-v3",
   ];
   await Promise.all(stale.map((key) => tf.io.removeModel(key).catch(() => {})));
 }
@@ -775,12 +1045,13 @@ async function boot() {
   });
   state.ready = true;
   setLoad(100, "Нейросеть готова — добавь фото");
-  if (segMeta) {
-    const miou = fmt((segMeta.miou_food || 0) * 100, 1);
-    const top1 = fmt((segMeta.food101_test_top1 || 0) * 100, 1);
+  ensureMemory().then((mem) => {
+    const miou = fmt((segMeta?.miou_food || 0) * 100, 1);
+    const top1 = fmt((segMeta?.food101_test_top1 || 0) * 100, 1);
+    const tail = mem ? " Память: " + mem.classes.length + " блюд, " + mem.count + " прототипов." : "";
     els.modelNote.textContent = "Ингредиенты: FoodSeg103, mIoU " + miou
-      + "%. Название блюда: Food-101, top-1 " + top1 + "%.";
-  }
+      + "%. Название: классификатор top-1 " + top1 + "%." + tail;
+  });
 }
 
 els.themeBtn.addEventListener("click", () => {
