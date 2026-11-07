@@ -51,7 +51,13 @@ python training/train.py \
 
 Порядок 101 класса обязан совпадать с `training/food101_classes.txt` (это копия `meta/classes.txt`: `cheesecake` стоит перед `cheese_plate`).
 
-## 4. Таблица калорий
+## 4. Сегментация ингредиентов
+
+`training/train_seg.py` берёт веса из шага 3 (`/tmp/caloric_head.weights.h5`), копирует их в энкодер и учит декодер на FoodSeg103. Датасет: `huggingface.co/datasets/EduardoPacheco/FoodSeg103` (в git не кладётся).
+
+Ранние блоки заморожены. Один проход по верхним блокам идёт с learning rate 1e-5. Если после него top-1 Food-101 на официальных 25 250 тестовых фото падает ниже 0,6106, блоки возвращаются к чекпоинту v1. Метрики пишутся в `training/seg_metrics.json`, модель — в `model/seg/`.
+
+## 5. Таблица калорий ингредиентов
 
 ```bash
 python training/build_nutrition.py

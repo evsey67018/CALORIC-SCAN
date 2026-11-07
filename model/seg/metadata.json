@@ -1,0 +1,14 @@
+{
+  "version": "seg-v2",
+  "task": "semantic-segmentation",
+  "dataset": "FoodSeg103",
+  "img_size": 224,
+  "output_size": 56,
+  "classes": 104,
+  "miou_food": 0.1318,
+  "pixel_acc": 0.608,
+  "food101_test_top1": 0.6106,
+  "food101_test_top5": 0.8546,
+  "quantize": "float16",
+  "bytes": 4978333
+}

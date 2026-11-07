@@ -101,8 +101,18 @@ h2 { margin: 0; font-size: 1.35rem; letter-spacing: -0.03em; line-height: 1.15; 
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
 }
-.upload { padding: 22px 18px 18px; text-align: center; }
+.upload { position: relative; display: block; padding: 22px 18px 18px; text-align: center; cursor: pointer; }
 .upload h2 { font-size: 1.5rem; }
+.upload input[type="file"] {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+  z-index: 2;
+}
+.add-label { pointer-events: none; display: inline-flex; align-items: center; justify-content: center; min-width: 200px; }
 .upload-art { font-size: 2.6rem; animation: bounce 2.4s ease-in-out infinite; }
 .upload.drag { outline: 3px dashed var(--lime); outline-offset: 4px; transform: scale(1.01); }
 @keyframes bounce {
@@ -189,7 +199,7 @@ h2 { margin: 0; font-size: 1.35rem; letter-spacing: -0.03em; line-height: 1.15; 
   min-height: 180px;
   box-shadow: var(--shadow);
 }
-.photo-card img { display: block; width: 100%; max-height: 460px; object-fit: contain; background: #101610; }
+.photo-card canvas { display: block; width: 100%; height: auto; background: #101610; }
 .scanline {
   position: absolute;
   left: 6%;
@@ -298,6 +308,26 @@ h2 { margin: 0; font-size: 1.35rem; letter-spacing: -0.03em; line-height: 1.15; 
 .sw.c { background: var(--carb); }
 .micro { min-height: 1.2em; font-weight: 750; }
 .note { font-size: 0.82rem; color: var(--muted); line-height: 1.4; }
+.note.warn { margin-top: 0; color: #9a3b12; background: rgba(255, 154, 61, 0.16); padding: 8px 10px; border-radius: 12px; }
+[data-theme="dark"] .note.warn { color: #ffd0a8; }
+.guess { margin: 0 0 8px; font-weight: 800; }
+.ing-title { margin: 4px 0 10px; }
+.ing-list { list-style: none; padding: 0; margin: 0 0 14px; display: grid; gap: 8px; }
+.ing-list li {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 10px;
+  align-items: center;
+  padding: 8px 10px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.35);
+  border: 1px solid var(--line);
+}
+[data-theme="dark"] .ing-list li { background: rgba(255, 255, 255, 0.04); }
+.ing-list .emo { font-size: 1.4rem; }
+.ing-list b { display: block; }
+.ing-list small { color: var(--muted); font-weight: 700; }
+.ing-kcal { font-weight: 800; font-variant-numeric: tabular-nums; }
 
 .diary { margin-top: 16px; padding: 18px 16px; }
 .diary-head, .goal-row, .dialog-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; }

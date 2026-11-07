@@ -1,32 +1,24 @@
-/* Caloric Scan: распознавание блюда моделью TFJS и подсчёт порции. */
-const KEY = "caloric-scan-diary-v1";
+/* Caloric Scan v2: ингредиенты FoodSeg103 + название блюда Food-101. */
+const DIARY_KEY = "caloric-scan-diary-v1";
 const THEME_KEY = "caloric-theme";
+const PLATE_CM = 26;
 
 const els = {
   themeBtn: document.getElementById("themeBtn"),
   dropzone: document.getElementById("dropzone"),
-  pickBtn: document.getElementById("pickBtn"),
-  shotBtn: document.getElementById("shotBtn"),
   file: document.getElementById("file"),
-  shotFile: document.getElementById("shotFile"),
   loadFill: document.getElementById("loadFill"),
   loadText: document.getElementById("loadText"),
   formError: document.getElementById("formError"),
   result: document.getElementById("result"),
   photoCard: document.getElementById("photoCard"),
-  photo: document.getElementById("photo"),
+  canvas: document.getElementById("photoCanvas"),
   scanline: document.getElementById("scanline"),
   photoStatus: document.getElementById("photoStatus"),
   resultCard: document.getElementById("resultCard"),
   lowConf: document.getElementById("lowConf"),
-  dishRu: document.getElementById("dishRu"),
-  dishEn: document.getElementById("dishEn"),
-  confPill: document.getElementById("confPill"),
-  alts: document.getElementById("alts"),
-  altsLabel: document.getElementById("altsLabel"),
-  gramsRange: document.getElementById("gramsRange"),
-  gramsNum: document.getElementById("gramsNum"),
-  per100: document.getElementById("per100"),
+  dishGuess: document.getElementById("dishGuess"),
+  ingList: document.getElementById("ingList"),
   vKcal: document.getElementById("vKcal"),
   vP: document.getElementById("vP"),
   vF: document.getElementById("vF"),
@@ -35,8 +27,6 @@ const els = {
   donutMid: document.getElementById("donutMid"),
   micro: document.getElementById("micro"),
   addBtn: document.getElementById("addBtn"),
-  fixBtn: document.getElementById("fixBtn"),
-  manualOpen: document.getElementById("manualOpen"),
   diaryTitle: document.getElementById("diaryTitle"),
   goal: document.getElementById("goal"),
   goalFill: document.getElementById("goalFill"),
@@ -46,30 +36,16 @@ const els = {
   diaryEmpty: document.getElementById("diaryEmpty"),
   clearDay: document.getElementById("clearDay"),
   modelNote: document.getElementById("modelNote"),
-  searchDialog: document.getElementById("searchDialog"),
-  searchInput: document.getElementById("searchInput"),
-  searchList: document.getElementById("searchList"),
-  cameraDialog: document.getElementById("cameraDialog"),
-  video: document.getElementById("video"),
-  shutter: document.getElementById("shutter"),
-  closeCam: document.getElementById("closeCam"),
-  useFileCam: document.getElementById("useFileCam"),
-  camError: document.getElementById("camError"),
 };
 
 const state = {
-  model: null,
+  dish: null,
+  seg: null,
   labels: [],
-  nutrition: null,
-  meta: null,
-  probs: null,
-  selected: -1,
-  manual: false,
-  imgSize: 160,
-  objectUrl: null,
-  stream: null,
+  ingredients: [],
+  segMeta: null,
   ready: false,
-  busy: false,
+  meal: null,
 };
 
 const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -91,9 +67,22 @@ function todayLabel() {
   return new Date().toLocaleDateString("ru-RU", { day: "numeric", month: "long" });
 }
 
+function plural(n, forms) {
+  const n10 = n % 10;
+  const n100 = n % 100;
+  if (n10 === 1 && n100 !== 11) return forms[0];
+  if (n10 >= 2 && n10 <= 4 && (n100 < 12 || n100 > 14)) return forms[1];
+  return forms[2];
+}
+
+function colorFor(id) {
+  const h = (id * 47) % 360;
+  return `hsl(${h} 72% 46%)`;
+}
+
 function loadDiary() {
   try {
-    const raw = JSON.parse(localStorage.getItem(KEY));
+    const raw = JSON.parse(localStorage.getItem(DIARY_KEY));
     if (!raw || typeof raw !== "object") throw new Error("empty");
     if (typeof raw.goal !== "number" || !Number.isFinite(raw.goal)) raw.goal = 2000;
     if (!raw.days || typeof raw.days !== "object") raw.days = {};
@@ -104,22 +93,16 @@ function loadDiary() {
 }
 
 function saveDiary(data) {
-  localStorage.setItem(KEY, JSON.stringify(data));
+  localStorage.setItem(DIARY_KEY, JSON.stringify(data));
 }
 
 function setError(text) {
-  if (!text) {
-    els.formError.hidden = true;
-    els.formError.textContent = "";
-    return;
-  }
-  els.formError.hidden = false;
-  els.formError.textContent = text;
+  els.formError.hidden = !text;
+  els.formError.textContent = text || "";
 }
 
 function setLoad(percent, text) {
-  const p = Math.max(0, Math.min(100, percent));
-  els.loadFill.style.width = p + "%";
+  els.loadFill.style.width = Math.max(0, Math.min(100, percent)) + "%";
   els.loadText.textContent = text;
 }
 
@@ -137,16 +120,16 @@ function burst(origin) {
   const rect = origin.getBoundingClientRect();
   const layer = document.createElement("div");
   layer.className = "confetti";
-  const bits = ["🍋", "🍅", "🥑", "✨", "🍓", "🥐"];
-  for (let i = 0; i < 22; i += 1) {
+  const bits = ["🍋", "🍅", "🥑", "✨", "🍓", "🍚"];
+  for (let i = 0; i < 18; i += 1) {
     const piece = document.createElement("i");
     piece.textContent = bits[i % bits.length];
     piece.style.left = rect.left + rect.width / 2 + "px";
-    piece.style.top = rect.top + 24 + "px";
+    piece.style.top = rect.top + 20 + "px";
     const ang = Math.random() * Math.PI * 2;
-    const dist = 70 + Math.random() * 140;
+    const dist = 70 + Math.random() * 120;
     piece.style.setProperty("--dx", Math.cos(ang) * dist + "px");
-    piece.style.setProperty("--dy", (Math.sin(ang) * dist - 30) + "px");
+    piece.style.setProperty("--dy", Math.sin(ang) * dist - 20 + "px");
     layer.appendChild(piece);
   }
   document.body.appendChild(layer);
@@ -156,7 +139,6 @@ function burst(origin) {
 function countTo(el, target, digits) {
   const token = Number(el.dataset.anim || "0") + 1;
   el.dataset.anim = String(token);
-  el.dataset.v = String(target);
   if (reduceMotion) {
     el.textContent = fmt(target, digits);
     return;
@@ -167,25 +149,10 @@ function countTo(el, target, digits) {
     if (el.dataset.anim !== String(token)) return;
     const k = Math.min(1, (now - start) / 620);
     const eased = 1 - (1 - k) ** 3;
-    const value = from + (target - from) * eased;
-    el.textContent = k < 1 ? fmt(value, digits) : fmt(target, digits);
+    el.textContent = fmt(from + (target - from) * eased, digits);
     if (k < 1) requestAnimationFrame(frame);
   }
   requestAnimationFrame(frame);
-}
-
-function foodOf(index) {
-  const label = state.labels[index];
-  if (!label) return null;
-  const item = state.nutrition.items[label.id];
-  if (!item) return null;
-  return { label, item };
-}
-
-function currentGrams() {
-  const n = Number(els.gramsNum.value);
-  if (!Number.isFinite(n)) return 100;
-  return Math.min(1500, Math.max(10, Math.round(n)));
 }
 
 function drawDonut(protein, fat, carbs) {
@@ -223,110 +190,6 @@ function drawDonut(protein, fat, carbs) {
   els.donutMid.textContent = Math.round((top.kcal / sum) * 100) + "% " + names[top.cls];
 }
 
-function renderAlts() {
-  els.alts.replaceChildren();
-  if (!state.probs) {
-    els.altsLabel.hidden = true;
-    return;
-  }
-  els.altsLabel.hidden = false;
-  const order = [...state.probs.keys()].sort((a, b) => state.probs[b] - state.probs[a]);
-  const picks = order.filter((idx) => idx !== state.selected).slice(0, 3);
-  for (const idx of picks) {
-    const food = foodOf(idx);
-    if (!food) continue;
-    const btn = document.createElement("button");
-    btn.type = "button";
-    btn.className = "alt";
-    const name = document.createElement("span");
-    name.textContent = food.label.ru + " ";
-    const pct = document.createElement("strong");
-    pct.textContent = fmt(state.probs[idx] * 100, state.probs[idx] < 0.1 ? 1 : 0) + "%";
-    btn.append(name, pct);
-    btn.addEventListener("click", () => selectDish(idx, false, true));
-    els.alts.appendChild(btn);
-  }
-}
-
-function renderResult(animate) {
-  const food = foodOf(state.selected);
-  if (!food) return;
-  const grams = currentGrams();
-  const scale = grams / 100;
-  const kcal = food.item.kcal * scale;
-  const protein = food.item.protein * scale;
-  const fat = food.item.fat * scale;
-  const carbs = food.item.carbs * scale;
-  els.result.hidden = false;
-  els.resultCard.hidden = false;
-  els.dishRu.textContent = food.label.ru;
-  els.dishEn.textContent = food.label.en;
-  const conf = state.probs ? state.probs[state.selected] : null;
-  if (state.manual) {
-    const tail = conf == null ? "" : " · модель " + fmt(conf * 100, 1) + "%";
-    els.confPill.textContent = "вручную" + tail;
-  } else if (conf != null) {
-    els.confPill.textContent = fmt(conf * 100, conf < 0.1 ? 1 : 0) + "%";
-  } else {
-    els.confPill.textContent = "—";
-  }
-  const unsure = !state.manual && conf != null && conf < 0.3;
-  els.lowConf.hidden = !unsure;
-  if (unsure) {
-    els.lowConf.textContent = "Уверенность ниже 30%. Выбери похожий вариант ниже или найди блюдо в списке — так цифры будут честнее.";
-  }
-  els.per100.textContent = "На 100 г: " + fmt(food.item.kcal, 0) + " ккал";
-  if (animate) {
-    countTo(els.vKcal, kcal, 0);
-    countTo(els.vP, protein, 1);
-    countTo(els.vF, fat, 1);
-    countTo(els.vC, carbs, 1);
-  } else {
-    for (const el of [els.vKcal, els.vP, els.vF, els.vC]) {
-      el.dataset.anim = String(Number(el.dataset.anim || "0") + 1);
-    }
-    els.vKcal.textContent = fmt(kcal, 0);
-    els.vP.textContent = fmt(protein, 1);
-    els.vF.textContent = fmt(fat, 1);
-    els.vC.textContent = fmt(carbs, 1);
-  }
-  drawDonut(protein, fat, carbs);
-  const bits = [];
-  if (food.item.fiber) bits.push("Клетчатка " + fmt(food.item.fiber * scale, 1) + " г");
-  if (food.item.sugar) bits.push("Сахар " + fmt(food.item.sugar * scale, 1) + " г");
-  els.micro.textContent = bits.join(" · ");
-  renderAlts();
-  els.resultCard.dataset.kcal = String(kcal);
-  els.resultCard.dataset.protein = String(protein);
-  els.resultCard.dataset.fat = String(fat);
-  els.resultCard.dataset.carbs = String(carbs);
-  els.resultCard.dataset.fiber = String((food.item.fiber || 0) * scale);
-  els.resultCard.dataset.sugar = String((food.item.sugar || 0) * scale);
-}
-
-function selectDish(index, manual, animate) {
-  state.selected = index;
-  state.manual = manual;
-  const food = foodOf(index);
-  if (food && animate) {
-    const portion = food.item.portion_g || 100;
-    els.gramsRange.value = String(Math.min(1000, portion));
-    els.gramsNum.value = String(portion);
-  }
-  renderResult(animate);
-  if (animate) burst(els.resultCard);
-}
-
-function syncGrams(fromRange) {
-  if (fromRange) els.gramsNum.value = els.gramsRange.value;
-  else {
-    const grams = currentGrams();
-    els.gramsNum.value = String(grams);
-    els.gramsRange.value = String(Math.min(1000, Math.max(20, grams)));
-  }
-  if (state.selected >= 0) renderResult(false);
-}
-
 function renderDiary() {
   const data = loadDiary();
   const key = todayKey();
@@ -334,20 +197,18 @@ function renderDiary() {
   els.goal.value = String(data.goal);
   els.diaryTitle.textContent = "Дневник · " + todayLabel();
   const totals = items.reduce((acc, item) => {
-    acc.kcal += item.kcal;
-    acc.protein += item.protein;
-    acc.fat += item.fat;
-    acc.carbs += item.carbs;
+    acc.kcal += Number(item.kcal) || 0;
+    acc.protein += Number(item.protein) || 0;
+    acc.fat += Number(item.fat) || 0;
+    acc.carbs += Number(item.carbs) || 0;
     return acc;
   }, { kcal: 0, protein: 0, fat: 0, carbs: 0 });
   const pct = data.goal > 0 ? Math.min(100, (totals.kcal / data.goal) * 100) : 0;
   els.goalFill.style.width = pct + "%";
   els.goalFill.parentElement.classList.toggle("over", totals.kcal > data.goal);
-  if (totals.kcal <= data.goal) {
-    els.goalText.textContent = fmt(totals.kcal, 0) + " из " + fmt(data.goal, 0) + " ккал · осталось " + fmt(data.goal - totals.kcal, 0);
-  } else {
-    els.goalText.textContent = fmt(totals.kcal, 0) + " из " + fmt(data.goal, 0) + " ккал · цель превышена на " + fmt(totals.kcal - data.goal, 0);
-  }
+  els.goalText.textContent = totals.kcal <= data.goal
+    ? fmt(totals.kcal, 0) + " из " + fmt(data.goal, 0) + " ккал · осталось " + fmt(Math.max(0, data.goal - totals.kcal), 0)
+    : fmt(totals.kcal, 0) + " из " + fmt(data.goal, 0) + " ккал · цель превышена на " + fmt(totals.kcal - data.goal, 0);
   els.dayMacros.textContent = items.length
     ? "Белки " + fmt(totals.protein, 1) + " г · Жиры " + fmt(totals.fat, 1) + " г · Углеводы " + fmt(totals.carbs, 1) + " г"
     : "";
@@ -357,14 +218,14 @@ function renderDiary() {
     const li = document.createElement("li");
     const text = document.createElement("div");
     const title = document.createElement("b");
-    title.textContent = item.nameRu;
+    title.textContent = item.nameRu || "Тарелка";
     const meta = document.createElement("small");
-    meta.textContent = fmt(item.grams, 0) + " г · " + fmt(item.kcal, 0) + " ккал";
+    meta.textContent = (item.detail ? item.detail + " · " : "") + fmt(item.kcal, 0) + " ккал";
     text.append(title, meta);
     const del = document.createElement("button");
     del.type = "button";
     del.className = "del";
-    del.setAttribute("aria-label", "Удалить " + item.nameRu);
+    del.setAttribute("aria-label", "Удалить запись");
     del.textContent = "✕";
     del.addEventListener("click", () => {
       const fresh = loadDiary();
@@ -377,204 +238,346 @@ function renderDiary() {
   }
 }
 
+function componentsOf(classes, w, h, id) {
+  const seen = new Uint8Array(w * h);
+  const parts = [];
+  for (let i = 0; i < w * h; i += 1) {
+    if (classes[i] !== id || seen[i]) continue;
+    const stack = [i];
+    seen[i] = 1;
+    let count = 0;
+    let sx = 0;
+    let sy = 0;
+    while (stack.length) {
+      const p = stack.pop();
+      const x = p % w;
+      const y = (p / w) | 0;
+      count += 1;
+      sx += x;
+      sy += y;
+      if (x > 0 && !seen[p - 1] && classes[p - 1] === id) { seen[p - 1] = 1; stack.push(p - 1); }
+      if (x + 1 < w && !seen[p + 1] && classes[p + 1] === id) { seen[p + 1] = 1; stack.push(p + 1); }
+      if (y > 0 && !seen[p - w] && classes[p - w] === id) { seen[p - w] = 1; stack.push(p - w); }
+      if (y + 1 < h && !seen[p + w] && classes[p + w] === id) { seen[p + w] = 1; stack.push(p + w); }
+    }
+    parts.push({ count, cx: sx / count, cy: sy / count });
+  }
+  return parts;
+}
+
+function plateScale(classes, w, h) {
+  let minX = w;
+  let minY = h;
+  let maxX = 0;
+  let maxY = 0;
+  let food = 0;
+  for (let y = 0; y < h; y += 1) {
+    for (let x = 0; x < w; x += 1) {
+      if (!classes[y * w + x]) continue;
+      food += 1;
+      if (x < minX) minX = x;
+      if (x > maxX) maxX = x;
+      if (y < minY) minY = y;
+      if (y > maxY) maxY = y;
+    }
+  }
+  if (!food) return null;
+  const bw = Math.max(1, maxX - minX + 1);
+  const bh = Math.max(1, maxY - minY + 1);
+  const span = Math.max(bw, bh);
+  const frame = Math.min(w, h);
+  const diameter = span > frame * 0.82 ? frame : Math.min(frame, span * 1.18);
+  return { cmPerPx: PLATE_CM / diameter, food, minX, minY, maxX, maxY };
+}
+
+function paint(work, classes, partsById) {
+  const canvas = els.canvas;
+  const ctx = canvas.getContext("2d");
+  const dw = Math.max(1, Math.round(work.w));
+  const dh = Math.max(1, Math.round(work.h));
+  canvas.width = dw;
+  canvas.height = dh;
+  ctx.drawImage(work.canvas, work.x, work.y, work.w, work.h, 0, 0, dw, dh);
+  const cell = work.size / classes.w;
+  ctx.globalAlpha = 0.42;
+  for (let y = 0; y < classes.h; y += 1) {
+    for (let x = 0; x < classes.w; x += 1) {
+      const id = classes.data[y * classes.w + x];
+      if (!id) continue;
+      const px = x * cell;
+      const py = y * cell;
+      if (px + cell < work.x || py + cell < work.y || px > work.x + work.w || py > work.y + work.h) continue;
+      ctx.fillStyle = colorFor(id);
+      ctx.fillRect(px - work.x, py - work.y, Math.ceil(cell), Math.ceil(cell));
+    }
+  }
+  ctx.globalAlpha = 1;
+  ctx.font = "bold 16px Manrope, sans-serif";
+  ctx.textAlign = "center";
+  ctx.lineWidth = 3;
+  for (const [id, parts] of partsById) {
+    const info = state.ingredients[id];
+    if (!info) continue;
+    const main = parts.slice().sort((a, b) => b.count - a.count)[0];
+    if (!main || main.count < 6) continue;
+    const tx = (main.cx + 0.5) * cell - work.x;
+    const ty = (main.cy + 0.5) * cell - work.y;
+    if (tx < 8 || ty < 16 || tx > dw - 8 || ty > dh - 8) continue;
+    ctx.strokeStyle = "rgba(0,0,0,0.55)";
+    ctx.fillStyle = "#fff";
+    ctx.strokeText(info.ru, tx, ty);
+    ctx.fillText(info.ru, tx, ty);
+  }
+}
+
+function renderMeal(meal, animate) {
+  state.meal = meal;
+  els.result.hidden = false;
+  els.resultCard.hidden = false;
+  els.photoCard.hidden = false;
+  els.lowConf.hidden = !meal.low;
+  els.lowConf.textContent = meal.low
+    ? "Разметка неуверенная — смотри на неё как на ориентир."
+    : "";
+  if (meal.dish) {
+    els.dishGuess.hidden = false;
+    els.dishGuess.textContent = "Похоже на: " + meal.dish.ru + " · " + fmt(meal.dish.conf * 100, 0) + "%";
+  } else {
+    els.dishGuess.hidden = true;
+  }
+  els.ingList.replaceChildren();
+  for (const row of meal.rows) {
+    const li = document.createElement("li");
+    const emo = document.createElement("span");
+    emo.className = "emo";
+    emo.textContent = row.emoji;
+    const text = document.createElement("div");
+    const title = document.createElement("b");
+    title.textContent = row.ru;
+    const meta = document.createElement("small");
+    const bits = [];
+    if (row.countLabel) bits.push(row.countLabel);
+    bits.push("~" + fmt(row.grams, 0) + " г");
+    meta.textContent = bits.join(" · ");
+    text.append(title, meta);
+    const kcal = document.createElement("span");
+    kcal.className = "ing-kcal";
+    kcal.textContent = fmt(row.kcal, 0);
+    li.append(emo, text, kcal);
+    els.ingList.appendChild(li);
+  }
+  if (animate) {
+    countTo(els.vKcal, meal.kcal, 0);
+    countTo(els.vP, meal.protein, 1);
+    countTo(els.vF, meal.fat, 1);
+    countTo(els.vC, meal.carbs, 1);
+  } else {
+    els.vKcal.textContent = fmt(meal.kcal, 0);
+    els.vP.textContent = fmt(meal.protein, 1);
+    els.vF.textContent = fmt(meal.fat, 1);
+    els.vC.textContent = fmt(meal.carbs, 1);
+  }
+  drawDonut(meal.protein, meal.fat, meal.carbs);
+  const fiber = meal.rows.reduce((sum, row) => sum + row.fiber, 0);
+  const sugar = meal.rows.reduce((sum, row) => sum + row.sugar, 0);
+  const micro = [];
+  if (fiber > 0.2) micro.push("Клетчатка " + fmt(fiber, 1) + " г");
+  if (sugar > 0.2) micro.push("Сахар " + fmt(sugar, 1) + " г");
+  els.micro.textContent = micro.join(" · ");
+}
+
 function addToDiary() {
-  const food = foodOf(state.selected);
-  if (!food) return;
+  const meal = state.meal;
+  if (!meal || !meal.rows.length) return;
   const data = loadDiary();
   const key = todayKey();
-  const entry = {
-    id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
-    label: food.label.id,
-    nameRu: food.label.ru,
-    nameEn: food.label.en,
-    grams: currentGrams(),
-    kcal: Number(els.resultCard.dataset.kcal),
-    protein: Number(els.resultCard.dataset.protein),
-    fat: Number(els.resultCard.dataset.fat),
-    carbs: Number(els.resultCard.dataset.carbs),
-    fiber: Number(els.resultCard.dataset.fiber),
-    sugar: Number(els.resultCard.dataset.sugar),
-    ts: Date.now(),
-  };
+  const names = meal.rows.map((row) => row.ru);
   data.days[key] = data.days[key] || [];
-  data.days[key].push(entry);
+  data.days[key].push({
+    id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+    nameRu: meal.dish ? meal.dish.ru : "Тарелка",
+    detail: names.slice(0, 4).join(", "),
+    kcal: meal.kcal,
+    protein: meal.protein,
+    fat: meal.fat,
+    carbs: meal.carbs,
+    grams: meal.rows.reduce((sum, row) => sum + row.grams, 0),
+    ts: Date.now(),
+  });
   saveDiary(data);
   renderDiary();
   burst(els.addBtn);
   els.addBtn.textContent = "В дневнике ✓";
-  setTimeout(() => {
-    els.addBtn.textContent = "Добавить в дневник";
-  }, 900);
+  setTimeout(() => { els.addBtn.textContent = "Добавить в дневник"; }, 900);
 }
 
-function openSearch() {
-  renderSearch(els.searchInput.value || "");
-  els.searchDialog.showModal();
-  els.searchInput.focus();
+function letterbox(bitmap, size) {
+  const canvas = document.createElement("canvas");
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext("2d");
+  ctx.fillStyle = "#14120f";
+  ctx.fillRect(0, 0, size, size);
+  const scale = Math.min(size / bitmap.width, size / bitmap.height);
+  const w = bitmap.width * scale;
+  const h = bitmap.height * scale;
+  const x = (size - w) / 2;
+  const y = (size - h) / 2;
+  ctx.drawImage(bitmap, x, y, w, h);
+  return { canvas, size, x, y, w, h };
 }
 
-function renderSearch(query) {
-  const q = query.trim().toLocaleLowerCase("ru");
-  els.searchList.replaceChildren();
-  const rows = state.labels
-    .map((label, index) => ({ label, index }))
-    .filter(({ label }) => {
-      if (!q) return true;
-      return (label.ru + " " + label.en + " " + label.id.replaceAll("_", " ")).toLocaleLowerCase("ru").includes(q);
-    })
-    .sort((a, b) => a.label.ru.localeCompare(b.label.ru, "ru"));
-  for (const row of rows) {
-    const btn = document.createElement("button");
-    btn.type = "button";
-    btn.className = "dish-pick";
-    const title = document.createElement("b");
-    title.textContent = row.label.ru;
-    const sub = document.createElement("small");
-    sub.textContent = row.label.en;
-    btn.append(title, sub);
-    btn.addEventListener("click", () => {
-      selectDish(row.index, true, true);
-      els.searchDialog.close();
-    });
-    els.searchList.appendChild(btn);
-  }
-  if (!rows.length) {
-    const empty = document.createElement("p");
-    empty.className = "muted";
-    empty.textContent = "Такого блюда в списке из 101 нет.";
-    els.searchList.appendChild(empty);
-  }
+function forward(model, image) {
+  let out = model.predict(image);
+  if (out && out.probs) out = out.probs;
+  if (out && out.logits) out = out.logits;
+  if (Array.isArray(out)) out = out[0];
+  return out;
 }
 
-async function fileToBitmap(file) {
-  if (!file || !file.type.startsWith("image/")) {
-    throw new Error("Этот файл не похож на фото. Подойдут JPG, PNG или WEBP.");
-  }
-  try {
-    return await createImageBitmap(file, { imageOrientation: "from-image" });
-  } catch {
-    throw new Error("Не удалось прочитать фото. Попробуй другой снимок.");
-  }
-}
-
-function showPhoto(file) {
-  if (state.objectUrl) URL.revokeObjectURL(state.objectUrl);
-  state.objectUrl = URL.createObjectURL(file);
-  els.photo.src = state.objectUrl;
+async function analyze(bitmap) {
+  const segSize = state.segMeta?.img_size || 224;
+  const work = letterbox(bitmap, segSize);
+  els.canvas.width = segSize;
+  els.canvas.height = segSize;
+  els.canvas.getContext("2d").drawImage(work.canvas, 0, 0);
   els.photoCard.hidden = false;
   els.result.hidden = false;
   els.scanline.hidden = false;
   els.photoStatus.hidden = false;
-  els.photoStatus.textContent = state.ready ? "Смотрим, что на тарелке…" : "Фото есть, ждём нейросеть…";
-}
+  els.photoStatus.textContent = "Ищем ингредиенты…";
 
-async function analyzeBitmap(bitmap) {
-  if (!state.model) return;
-  state.busy = true;
-  els.scanline.hidden = false;
-  els.photoStatus.hidden = false;
-  const size = state.imgSize;
-  const scores = tf.tidy(() => {
-    const img = tf.browser.fromPixels(bitmap);
-    const resized = tf.image.resizeBilinear(img, [size, size]).toFloat();
-    const batched = resized.expandDims(0);
-    let out = state.model.predict(batched);
-    if (out && out.probs) out = out.probs;
-    if (Array.isArray(out)) out = out[0];
-    return out;
+  const logits = tf.tidy(() => {
+    const img = tf.browser.fromPixels(work.canvas).toFloat().expandDims(0);
+    return forward(state.seg, img);
   });
-  const data = await scores.data();
-  scores.dispose();
-  bitmap.close?.();
-  state.probs = Float32Array.from(data);
-  let best = 0;
-  for (let i = 1; i < state.probs.length; i += 1) {
-    if (state.probs[i] > state.probs[best]) best = i;
+  const classTensor = logits.argMax(-1);
+  const confTensor = tf.tidy(() => logits.softmax().max(-1));
+  const classData = await classTensor.data();
+  const confData = await confTensor.data();
+  const shape = classTensor.shape;
+  const gridH = shape[shape.length - 2];
+  const gridW = shape[shape.length - 1];
+  logits.dispose();
+  classTensor.dispose();
+  confTensor.dispose();
+
+  const classes = { data: classData, w: gridW, h: gridH };
+  const scale = plateScale(classData, gridW, gridH);
+  if (!scale) {
+    els.scanline.hidden = true;
+    els.photoStatus.hidden = true;
+    setError("Не вижу еды на фото. Попробуй снимок тарелки сверху.");
+    bitmap.close?.();
+    return;
   }
-  state.busy = false;
+  const rows = [];
+  const partsById = new Map();
+  let confSum = 0;
+  let confN = 0;
+  for (let i = 0; i < classData.length; i += 1) {
+    if (classData[i]) {
+      confSum += confData[i];
+      confN += 1;
+    }
+  }
+  const meanConf = confN ? confSum / confN : 0;
+  for (let id = 1; id < state.ingredients.length; id += 1) {
+    const info = state.ingredients[id];
+    if (!info) continue;
+    const parts = componentsOf(classData, gridW, gridH, id).filter((part) => part.count >= 6);
+    const pixels = parts.reduce((sum, part) => sum + part.count, 0);
+    const gramsRaw = pixels * scale.cmPerPx * scale.cmPerPx * info.g_per_cm2;
+    // Мелкие пятна маски не показываем: это шум сетки 56×56, не порция.
+    if (gramsRaw < 8 || pixels < 8) continue;
+    partsById.set(id, parts);
+    const grams = Math.min(600, gramsRaw);
+    const k = grams / 100;
+    let countLabel = "";
+    if (info.countable && parts.length) {
+      countLabel = parts.length + " " + plural(parts.length, info.unit || ["шт.", "шт.", "шт."]);
+    }
+    rows.push({
+      id,
+      ru: info.ru,
+      emoji: info.emoji,
+      grams,
+      kcal: info.kcal * k,
+      protein: info.protein * k,
+      fat: info.fat * k,
+      carbs: info.carbs * k,
+      fiber: (info.fiber || 0) * k,
+      sugar: (info.sugar || 0) * k,
+      countLabel,
+    });
+  }
+  rows.sort((a, b) => b.kcal - a.kcal);
+  paint(work, classes, partsById);
+
+  let dish = null;
+  if (state.dish) {
+    const dishSize = state.dish.inputs?.[0]?.shape?.[1] || 160;
+    const scores = tf.tidy(() => {
+      const img = tf.browser.fromPixels(work.canvas);
+      const resized = tf.image.resizeBilinear(img, [dishSize, dishSize]).toFloat().expandDims(0);
+      return forward(state.dish, resized);
+    });
+    const data = await scores.data();
+    scores.dispose();
+    let best = 0;
+    for (let i = 1; i < data.length; i += 1) if (data[i] > data[best]) best = i;
+    if (data[best] >= 0.4 && state.labels[best]) dish = { ...state.labels[best], conf: data[best] };
+  }
+
   els.scanline.hidden = true;
   els.photoStatus.hidden = true;
-  selectDish(best, false, true);
+  bitmap.close?.();
+  const meal = {
+    rows,
+    dish,
+    low: meanConf < 0.4,
+    kcal: rows.reduce((sum, row) => sum + row.kcal, 0),
+    protein: rows.reduce((sum, row) => sum + row.protein, 0),
+    fat: rows.reduce((sum, row) => sum + row.fat, 0),
+    carbs: rows.reduce((sum, row) => sum + row.carbs, 0),
+  };
+  if (!rows.length) {
+    setError("Ингредиенты не разобрались. Попробуй другое фото.");
+    return;
+  }
+  setError("");
+  renderMeal(meal, true);
+  burst(els.resultCard);
+}
+
+async function fileToBitmap(file) {
+  if (!file || !file.type.startsWith("image/")) {
+    throw new Error("Нужно фото: JPG, PNG или WEBP.");
+  }
+  return createImageBitmap(file, { imageOrientation: "from-image" });
 }
 
 async function handleFile(file) {
   setError("");
+  if (!state.ready) {
+    setError("Нейросеть ещё загружается.");
+    return;
+  }
   let bitmap;
   try {
     bitmap = await fileToBitmap(file);
   } catch (err) {
-    setError(err.message || "Не получилось открыть файл.");
-    return;
-  }
-  showPhoto(file);
-  if (!state.ready) {
-    state.pending = bitmap;
+    setError(err.message || "Не удалось открыть фото.");
     return;
   }
   try {
-    await analyzeBitmap(bitmap);
+    await analyze(bitmap);
   } catch (err) {
     console.error(err);
     els.scanline.hidden = true;
     els.photoStatus.hidden = true;
-    setError("Не удалось распознать фото. Попробуй ещё раз или выбери блюдо вручную.");
+    setError("Не получилось разобрать фото. Попробуй ещё раз.");
   }
-}
-
-function stopCamera() {
-  if (state.stream) {
-    for (const track of state.stream.getTracks()) track.stop();
-    state.stream = null;
-  }
-  els.video.srcObject = null;
-}
-
-async function openCamera() {
-  els.camError.hidden = true;
-  if (!navigator.mediaDevices?.getUserMedia) {
-    els.shotFile.click();
-    return;
-  }
-  try {
-    state.stream = await navigator.mediaDevices.getUserMedia({
-      audio: false,
-      video: { facingMode: { ideal: "environment" } },
-    });
-    els.video.srcObject = state.stream;
-    els.cameraDialog.showModal();
-  } catch (err) {
-    const name = err && err.name;
-    if (name === "NotAllowedError") {
-      setError("Нет доступа к камере. Разреши камеру в браузере или выбери снимок из галереи.");
-    } else if (name === "NotFoundError" || name === "OverconstrainedError") {
-      setError("Камера не найдена. Можно выбрать готовое фото.");
-    } else {
-      setError("Камера не открылась. Выбери файл или снимок из галереи.");
-    }
-    els.shotFile.click();
-  }
-}
-
-async function takePhoto() {
-  const video = els.video;
-  if (!video.videoWidth) {
-    els.camError.hidden = false;
-    els.camError.textContent = "Камера ещё не дала кадр. Подожди секунду.";
-    return;
-  }
-  const canvas = document.createElement("canvas");
-  canvas.width = video.videoWidth;
-  canvas.height = video.videoHeight;
-  canvas.getContext("2d").drawImage(video, 0, 0);
-  const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.92));
-  stopCamera();
-  els.cameraDialog.close();
-  if (!blob) {
-    setError("Не удалось сохранить кадр.");
-    return;
-  }
-  const file = new File([blob], "camera.jpg", { type: "image/jpeg" });
-  await handleFile(file);
 }
 
 async function prepareBackend() {
@@ -587,88 +590,54 @@ async function prepareBackend() {
   }
 }
 
-async function loadModel() {
-  await prepareBackend();
-  const metaUrl = new URL("model/metadata.json", document.baseURI);
+async function loadGraph(url, idbKey, onProgress) {
   try {
-    const res = await fetch(metaUrl);
-    if (res.ok) state.meta = await res.json();
+    return await tf.loadGraphModel(idbKey);
   } catch {
-    state.meta = null;
-  }
-  if (state.meta?.img_size) state.imgSize = state.meta.img_size;
-  const version = state.meta?.version || "v1";
-  const idb = "indexeddb://caloric-scan-" + version;
-  const modelUrl = new URL("model/model.json", document.baseURI).href;
-  try {
-    state.model = await tf.loadGraphModel(idb);
-    setLoad(100, "Нейросеть взята из памяти браузера");
-  } catch {
-    state.model = await tf.loadGraphModel(modelUrl, {
-      onProgress: (frac) => {
-        const pct = Math.round(frac * 100);
-        setLoad(pct, "Загружаем нейросеть… " + pct + "%");
-      },
-    });
-    setLoad(100, "Сохраняем модель в браузере…");
-    try {
-      await state.model.save(idb);
-    } catch (err) {
-      console.warn("indexeddb", err);
-    }
-    setLoad(100, "Нейросеть готова — можно снимать");
-  }
-  const shape = state.model.inputs?.[0]?.shape;
-  if (shape && shape.length >= 3 && shape[1] > 0) state.imgSize = shape[1];
-  const warm = tf.zeros([1, state.imgSize, state.imgSize, 3]);
-  const out = state.model.predict(warm);
-  const tensor = out && out.probs ? out.probs : (Array.isArray(out) ? out[0] : out);
-  if (tensor && tensor.data) await tensor.data();
-  warm.dispose();
-  tf.dispose(out);
-  state.ready = true;
-  setLoad(100, "Нейросеть готова — можно снимать");
-  if (state.meta && state.meta.test_top1) {
-    const top1 = fmt(state.meta.test_top1 * 100, 1);
-    const top5 = fmt(state.meta.test_top5 * 100, 1);
-    els.modelNote.textContent = "Модель " + (state.meta.backbone || "MobileNetV2")
-      + " на официальном тесте Food-101 (" + state.meta.test_images + " фото): top-1 "
-      + top1 + "%, top-5 " + top5 + "%.";
-  }
-  if (state.pending) {
-    const pending = state.pending;
-    state.pending = null;
-    await analyzeBitmap(pending);
+    const model = await tf.loadGraphModel(url, { onProgress });
+    try { await model.save(idbKey); } catch (err) { console.warn(err); }
+    return model;
   }
 }
 
 async function boot() {
   applyTheme(localStorage.getItem(THEME_KEY) || "light");
   renderDiary();
-  const [labels, nutrition] = await Promise.all([
+  const [labels, ingredients, segMeta] = await Promise.all([
     fetch(new URL("data/labels.json", document.baseURI)).then((r) => r.json()),
-    fetch(new URL("data/nutrition.json", document.baseURI)).then((r) => r.json()),
+    fetch(new URL("data/ingredients.json", document.baseURI)).then((r) => r.json()),
+    fetch(new URL("model/seg/metadata.json", document.baseURI)).then((r) => (r.ok ? r.json() : null)),
   ]);
   state.labels = labels;
-  state.nutrition = nutrition;
-  renderSearch("");
-  await loadModel();
+  state.ingredients = ingredients.items;
+  state.segMeta = segMeta;
+  await prepareBackend();
+  const dishUrl = new URL("model/model.json", document.baseURI).href;
+  const segUrl = new URL("model/seg/model.json", document.baseURI).href;
+  setLoad(5, "Загружаем модель блюда…");
+  state.dish = await loadGraph(dishUrl, "indexeddb://caloric-dish-v1", (frac) => {
+    setLoad(5 + frac * 40, "Загружаем модель блюда… " + Math.round(frac * 100) + "%");
+  });
+  setLoad(50, "Загружаем модель ингредиентов…");
+  state.seg = await loadGraph(segUrl, "indexeddb://caloric-seg-v2", (frac) => {
+    setLoad(50 + frac * 50, "Загружаем модель ингредиентов… " + Math.round(frac * 100) + "%");
+  });
+  state.ready = true;
+  setLoad(100, "Нейросеть готова — добавь фото");
+  if (segMeta) {
+    const miou = fmt((segMeta.miou_food || 0) * 100, 1);
+    const top1 = fmt((segMeta.food101_test_top1 || 0) * 100, 1);
+    els.modelNote.textContent = "Ингредиенты: FoodSeg103, mIoU " + miou
+      + "%. Название блюда: Food-101, top-1 " + top1 + "%.";
+  }
 }
 
 els.themeBtn.addEventListener("click", () => {
-  const next = document.documentElement.dataset.theme === "dark" ? "light" : "dark";
-  applyTheme(next);
+  applyTheme(document.documentElement.dataset.theme === "dark" ? "light" : "dark");
 });
-els.pickBtn.addEventListener("click", () => els.file.click());
-els.shotBtn.addEventListener("click", () => openCamera());
 els.file.addEventListener("change", () => {
   const file = els.file.files && els.file.files[0];
   els.file.value = "";
-  if (file) handleFile(file);
-});
-els.shotFile.addEventListener("change", () => {
-  const file = els.shotFile.files && els.shotFile.files[0];
-  els.shotFile.value = "";
   if (file) handleFile(file);
 });
 ["dragenter", "dragover"].forEach((name) => {
@@ -680,19 +649,15 @@ els.shotFile.addEventListener("change", () => {
 ["dragleave", "drop"].forEach((name) => {
   els.dropzone.addEventListener(name, (event) => {
     event.preventDefault();
-    els.dropzone.classList.remove("drag");
+    if (name === "dragleave") els.dropzone.classList.remove("drag");
   });
 });
 els.dropzone.addEventListener("drop", (event) => {
-  const file = event.dataTransfer.files && event.dataTransfer.files[0];
+  els.dropzone.classList.remove("drag");
+  const file = event.dataTransfer && event.dataTransfer.files && event.dataTransfer.files[0];
   if (file) handleFile(file);
 });
-els.gramsRange.addEventListener("input", () => syncGrams(true));
-els.gramsNum.addEventListener("input", () => syncGrams(false));
 els.addBtn.addEventListener("click", addToDiary);
-els.fixBtn.addEventListener("click", openSearch);
-els.manualOpen.addEventListener("click", openSearch);
-els.searchInput.addEventListener("input", () => renderSearch(els.searchInput.value));
 els.goal.addEventListener("change", () => {
   const data = loadDiary();
   const goal = Number(els.goal.value);
@@ -707,20 +672,9 @@ els.clearDay.addEventListener("click", () => {
   saveDiary(data);
   renderDiary();
 });
-els.shutter.addEventListener("click", () => takePhoto());
-els.closeCam.addEventListener("click", () => {
-  stopCamera();
-  els.cameraDialog.close();
-});
-els.useFileCam.addEventListener("click", () => {
-  stopCamera();
-  els.cameraDialog.close();
-  els.shotFile.click();
-});
-els.cameraDialog.addEventListener("close", stopCamera);
 
 boot().catch((err) => {
   console.error(err);
   setLoad(0, "Не удалось загрузить модель");
-  setError("Не удалось загрузить модель. Проверь интернет и обнови страницу. Блюдо всё равно можно выбрать из списка, но по фото — только с моделью.");
+  setError("Не удалось загрузить модель. Проверь интернет и обнови страницу.");
 });

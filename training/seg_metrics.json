@@ -1,0 +1,113 @@
+{
+  "dataset": "FoodSeg103",
+  "split": "validation",
+  "val_images": 2135,
+  "img_size": 224,
+  "output_size": 56,
+  "miou_food_at_56": 0.1318,
+  "miou_food_at_224": 0.1318,
+  "pixel_acc_at_224": 0.608,
+  "classes_present": 103,
+  "iou_low": [
+    {
+      "id": 2,
+      "iou": 0.0
+    },
+    {
+      "id": 7,
+      "iou": 0.0
+    },
+    {
+      "id": 19,
+      "iou": 0.0
+    },
+    {
+      "id": 23,
+      "iou": 0.0
+    },
+    {
+      "id": 26,
+      "iou": 0.0
+    },
+    {
+      "id": 28,
+      "iou": 0.0
+    },
+    {
+      "id": 43,
+      "iou": 0.0
+    },
+    {
+      "id": 60,
+      "iou": 0.0
+    }
+  ],
+  "iou_high": [
+    {
+      "id": 59,
+      "iou": 0.5447
+    },
+    {
+      "id": 87,
+      "iou": 0.5421
+    },
+    {
+      "id": 84,
+      "iou": 0.4762
+    },
+    {
+      "id": 95,
+      "iou": 0.4586
+    },
+    {
+      "id": 30,
+      "iou": 0.4078
+    },
+    {
+      "id": 73,
+      "iou": 0.3796
+    },
+    {
+      "id": 32,
+      "iou": 0.3302
+    },
+    {
+      "id": 66,
+      "iou": 0.3216
+    }
+  ],
+  "food101_test_top1": 0.6106,
+  "food101_test_top5": 0.8546,
+  "food101_test_images": 25250,
+  "food101_floor": 0.6106,
+  "init": "Food-101 MobileNetV2 checkpoint v1 (not ImageNet from scratch)",
+  "finetune": {
+    "epochs": 1,
+    "lr": 1e-05,
+    "unfrozen_layers": 12,
+    "probe_images": 808,
+    "probe_top1_before": 0.651,
+    "probe_top1_after": 0.6485,
+    "kept_backbone": "top_blocks_finetuned",
+    "reverted_full_test": true
+  },
+  "conversion": {
+    "files": [
+      {
+        "file": "group1-shard1of2.bin",
+        "bytes": 4194304
+      },
+      {
+        "file": "group1-shard2of2.bin",
+        "bytes": 661292
+      },
+      {
+        "file": "model.json",
+        "bytes": 122737
+      }
+    ],
+    "bytes": 4978333,
+    "quantize": "float16"
+  },
+  "note": "mIoU считается по 103 пищевым классам (фон не входит в среднее), только по классам, которые встретились в validation. at_224 — маска, растянутая ближайшим соседом до входа модели."
+}
